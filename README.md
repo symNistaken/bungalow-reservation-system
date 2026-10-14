@@ -21,7 +21,7 @@ Bu depo, [CGhost1908/bungalow-reservation-system](https://github.com/CGhost1908/
 - Gmail SMTP üzerinden yönetici ve müşteri bildirimleri.
 - SQLite saklama, eski JSON kayıtları için taşıma yardımcıları ve loglama.
 
-> Yerel geliştirme projesidir. Oturum açma tek başına CSRF koruması sağlamaz; mevcut uygulamada CSRF token doğrulaması bulunmaz.
+> Yerel çalışma için şifreyi kendin ayarla. Üretim modu eksik oturum anahtarı, zayıf varsayılan şifre ve paylaşımsız istek sınırı yapılandırmasını reddeder.
 
 ## Akış
 
@@ -76,7 +76,7 @@ Rastgele oturum anahtarı üretmek için:
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Gmail için [iki aşamalı doğrulama](https://support.google.com/accounts/answer/185839) ve [uygulama şifresi](https://myaccount.google.com/apppasswords) kullan. Normal hesap şifreni paylaşma. E-posta ayarları eksikse bildirimler çalışmaz; uygulama terminalde uyarı verir. SMTP sunucusu mevcut kodda `smtp.gmail.com:587` olarak sabittir; `.env.example` içindeki isteğe bağlı SMTP ayarları kod tarafından okunmaz.
+Gmail için [iki aşamalı doğrulama](https://support.google.com/accounts/answer/185839) ve [uygulama şifresi](https://myaccount.google.com/apppasswords) kullan. Normal hesap şifreni paylaşma. E-posta ayarları eksikse bildirimler çalışmaz; uygulama terminalde uyarı verir. `SMTP_SERVER` ve `SMTP_PORT` ortam değişkenleri okunur; varsayılan `smtp.gmail.com:587`. SMTP bağlantısında zaman aşımı vardır.
 
 Windows:
 
@@ -98,7 +98,7 @@ Linux/macOS:
 
 **Yönetici:** `/admin/login` üzerinden `.env` içinde belirlediğin bilgilerle giriş yap. `/admin` sayfasında talepleri listele, takvimi incele ve onay/red işlemlerini yap.
 
-Yönetici bilgileri verilmezse kod `admin` / `admin123` varsayılanlarını kullanır. Gerçek kullanım öncesinde bunları ve varsayılan oturum anahtarını mutlaka değiştir.
+Yönetici kullanıcı adı varsayılan `admin` olabilir; şifre zorunludur ve `admin123` kabul edilmez. Geliştirmede SECRET_KEY verilmezse her başlangıçta rastgele anahtar üretilir; mevcut oturumlar yeniden başlatmada sona erer.
 
 ## Sayfalar ve API
 
@@ -107,7 +107,8 @@ Yönetici bilgileri verilmezse kod `admin` / `admin123` varsayılanlarını kull
 | `/`, `/bungalows`, `/gallery` | GET | Genel sayfalar |
 | `/reservation` | GET | Rezervasyon formu |
 | `/admin/login` | GET, POST | Yönetici girişi |
-| `/admin`, `/admin/logout` | GET | Yönetici paneli / çıkış |
+| `/admin` | GET | Yönetici paneli |
+| `/admin/logout` | POST | Yönetici çıkışı; CSRF token gerekli |
 | `/api/reservation` | POST | Herkese açık talep oluşturma |
 | `/api/reservations` | GET | Yönetici oturumu; tüm kayıtlar |
 | `/api/reservations/pending` | GET | Yönetici oturumu; bekleyen kayıtlar |
@@ -116,7 +117,7 @@ Yönetici bilgileri verilmezse kod `admin` / `admin123` varsayılanlarını kull
 | `/api/booked-dates` | GET | Genel doluluk bilgisi; isteğe bağlı `bungalow` query alanı |
 | `/api/bungalow-dates/<bungalow>` | GET | Yönetici oturumu; durum ve misafir adları |
 
-Yönetici oturumu gerektiren uç noktalar giriş yapılmamışsa `/admin/login` adresine yönlendirir. `/api/reservation` JSON gövdesinde şu alanları bekler:
+Yönetici oturumu gerektiren uç noktalar giriş yapılmamışsa `/admin/login` adresine yönlendirir. Tüm durum değiştiren POST istekleri, aynı oturumdaki sayfada üretilmiş CSRF token gerektirir. HTML sayfalarının `csrf-token` meta alanındaki değeri `X-CSRFToken` başlığında gönder; logout formu gizli `csrf_token` alanını kullanır. Yeni token için sayfayı yenile. `/api/reservation` JSON gövdesinde şu alanları bekler:
 
 ```json
 {
@@ -156,7 +157,7 @@ Asıl saklama dosyası **`reservations.db`**; `reservations.json` eski taşıma 
 Paketler kurulduktan sonra, sanal ortamın Python'u ile depo kökünde:
 
 ```bash
-python -m unittest test_app -v
+python -m unittest test_app test_security -v
 ```
 
 Bu testler doğrulama, SQLite işlemleri ve API davranışlarını kapsar. Test içe aktarması yerel veritabanı/log dosyaları oluşturabilir; canlı veritabanının bulunduğu dizinde çalıştırma. E-posta testini yalnızca kendi hesabın ve alıcılarınla çalıştır:
@@ -171,10 +172,10 @@ E-posta testi SMTP'ye bağlanır ve yapılandırılmış adreslere bildirim gön
 
 - Yönetici listeleri, onay/red uç noktaları ve misafir isimli takvim, yönetici oturumu gerektirir.
 - Şifreler Werkzeug ile hash'lenir; rate limiting ve güvenlik başlığı bileşenleri bulunur.
-- CSRF token doğrulaması henüz uygulanmaz. Oturum kontrolü bu açığı tek başına çözmez.
-- Kod geliştirme sunucusunu `debug=True` ile başlatır; üretim için debug kapatılmalı, uygun WSGI sunucusu ve HTTPS kullanılmalıdır.
-- CORS API için geniş tanımlıdır; üretimde izinli origin'lere sınırlandırılmalıdır.
-- Tarih kontrolü onaylı kayıtları esas alır; bekleyen talepler aynı tarihlere gelebilir. Onay sırasında çakışma/concurrency güvenliği ayrıca güçlendirilmelidir.
+- Flask-WTF CSRF doğrulaması login, rezervasyon, karar ve logout POST isteklerini korur. Token oturuma bağlıdır. Yönetici girişi eski oturum değerlerini temizler; oturum süresi bir saattir.
+- Debug varsayılan olarak kapalıdır. Üretimde uygun WSGI sunucusu ve HTTPS kullan; geliştirme sunucusunu internete açma.
+- Wildcard CORS kaldırıldı; arayüz aynı origin üzerinde çalışır. Kullanıcı metinleri yönetici kartlarında ve HTML e-postalarda escape edilir.
+- Bekleyen talepler aynı tarihlere gelebilir; onay kontrolü SQLite yazma işlemiyle aynı transaction içinde yapılır. Eşzamanlı çakışan onaylardan yalnızca biri kabul edilir. Onay/red yalnızca bekleyen kaydı değiştirir; başka kayıtlar silinmez. JSON taşıma mevcut kayıtları korur.
 
 ## Sorun giderme
 
@@ -201,3 +202,24 @@ Fork'tan gelen frontend ve diğer geliştiricilerin katkıları yeniden lisansla
 ## Otomatik kontroller
 
 [GitHub Actions](https://github.com/symNistaken/bungalow-reservation-system/actions) her push ve pull request için sözdizimi ve uygulama testlerini çalıştırır. Gerçek SMTP gönderimi bu testlerin dışında kalır.
+
+## Üretim yapılandırması
+
+```dotenv
+APP_ENV=production
+SECRET_KEY=YOUR_RANDOM_32_OR_MORE_CHARACTER_SECRET
+ADMIN_PASSWORD=YOUR_STRONG_12_OR_MORE_CHARACTER_PASSWORD
+RATELIMIT_STORAGE_URI=redis://localhost:6379/0
+```
+
+Redis bağlantısını kendi altyapına göre ayarla. `memory://` üretim modunda kabul edilmez. HTTPS üzerinde oturum çerezi `Secure`, `HttpOnly` ve `SameSite=Lax` kullanır.
+
+Sanal ortam etkinleştirildikten sonra örnek WSGI komutu:
+
+```bash
+waitress-serve --listen=127.0.0.1:8000 app:app
+```
+
+Bu komut yalnızca yerel WSGI başlatır. HTTPS reverse proxy kurulumu, güvenilir proxy ayarları, Redis erişim kontrolü, yedekleme ve e-posta hesabı gerçek sunucu üzerinde ayrıca yapılandırılmalıdır. HTTPS şemasının uygulamaya yalnızca güvenilir proxy üzerinden aktarılması gerekir; rastgele istemcilerin gönderdiği forwarded başlıklarına güvenme.
+
+`test_app` ve `test_security` birlikte 37 test içerir: CSRF, login/logout, üretim yapılandırmasının reddi, eşzamanlı onay, JSON taşıma ve HTML e-posta escape kontrolleri dahil. Testler gerçek müşterilere e-posta göndermez.

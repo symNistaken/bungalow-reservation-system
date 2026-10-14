@@ -17,4 +17,4 @@ jobs:
       - name: Check syntax
         run: python -m compileall -q app.py database.py inspect_db.py test_app.py
       - name: Validate application and admin access
-        run: python -m unittest test_app -v
+        run: python -m unittest test_app test_security -v

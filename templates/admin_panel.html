@@ -3,6 +3,7 @@
 
 <html lang="tr">
 <head>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel - Rezervasyonlar</title>
@@ -401,7 +402,7 @@
 <body>
     <div class="header">
         <h1>🏠 Bungalow Admin Panel</h1>
-        <a href="/admin/logout" class="logout-btn">Çıkış Yap</a>
+        <form action="/admin/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout-btn" type="submit">Çıkış Yap</button></form>
     </div>
 
     <div class="container">
@@ -752,6 +753,12 @@
         }
 
         // Create reservation HTML
+        function escapeHTML(value) {
+            const element = document.createElement('span');
+            element.textContent = String(value ?? '');
+            return element.innerHTML;
+        }
+
         function createReservationHTML(res, showActions) {
             const checkInDate = new Date(res.checkIn).toLocaleDateString('tr-TR');
             const checkOutDate = new Date(res.checkOut).toLocaleDateString('tr-TR');
@@ -760,19 +767,19 @@
             return `
                 <div class="reservation-item">
                     <div class="reservation-info">
-                        <div class="guest-name">${res.name}</div>
+                        <div class="guest-name">${escapeHTML(res.name)}</div>
                         <div class="guest-details">
                             <div class="detail-item">
                                 <span class="detail-label">Email:</span>
-                                <span>${res.email}</span>
+                                <span>${escapeHTML(res.email)}</span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Telefon:</span>
-                                <span>${res.phone}</span>
+                                <span>${escapeHTML(res.phone)}</span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Bungalow:</span>
-                                <span>${res.bungalow}</span>
+                                <span>${escapeHTML(res.bungalow)}</span>
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Giriş:</span>
@@ -784,14 +791,14 @@
                             </div>
                             <div class="detail-item">
                                 <span class="detail-label">Kişi Sayısı:</span>
-                                <span>${res.guests}</span>
+                                <span>${escapeHTML(res.guests)}</span>
                             </div>
                         </div>
-                        <span class="status ${res.status}">${statusText}</span>
+                        <span class="status ${['pending', 'approved', 'rejected'].includes(res.status) ? res.status : 'pending'}">${statusText}</span>
                         ${showActions ? `
                             <div class="actions">
-                                <button class="action-btn approve-btn" data-id="${res.id}">✓ Onayla</button>
-                                <button class="action-btn reject-btn" data-id="${res.id}">✕ Reddet</button>
+                                <button class="action-btn approve-btn" data-id="${escapeHTML(res.id)}">✓ Onayla</button>
+                                <button class="action-btn reject-btn" data-id="${escapeHTML(res.id)}">✕ Reddet</button>
                             </div>
                         ` : ''}
                     </div>
@@ -804,8 +811,9 @@
             if (!confirm('Bu rezervasyonu onaylamak istediğiniz emin misiniz?')) return;
             
             try {
-                const response = await fetch(`/api/reservations/${id}/approve`, {
-                    method: 'POST'
+                const response = await fetch(`/api/reservations/${encodeURIComponent(id)}/approve`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content }
                 });
                 
                 if (response.ok) {
@@ -828,8 +836,9 @@
             if (!confirm('Bu rezervasyonu reddetmek istediğiniz emin misiniz?')) return;
             
             try {
-                const response = await fetch(`/api/reservations/${id}/reject`, {
-                    method: 'POST'
+                const response = await fetch(`/api/reservations/${encodeURIComponent(id)}/reject`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content }
                 });
                 
                 if (response.ok) {

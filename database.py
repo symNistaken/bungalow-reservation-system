@@ -101,57 +101,70 @@ def get_reservation_by_id(reservation_id):
         row = cursor.fetchone()
         return dict_from_row(row)
 
+def _write_reservation(conn, reservation):
+    """Upsert one row on the caller's transaction without replacing other rows."""
+    columns = ('id', 'name', 'email', 'phone', 'checkIn', 'checkOut', 'guests',
+               'bungalow', 'notes', 'status', 'timestamp', 'approved_date', 'rejected_date')
+    values = dict(reservation)
+    values.setdefault('notes', '')
+    values.setdefault('status', 'pending')
+    values.setdefault('timestamp', datetime.now().isoformat())
+    update = ', '.join(f'{column}=excluded.{column}' for column in columns[1:])
+    conn.execute(
+        f"INSERT INTO reservations ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)}) "
+        f"ON CONFLICT(id) DO UPDATE SET {update}, updated_at=CURRENT_TIMESTAMP",
+        [values.get(column) for column in columns],
+    )
+
+
 def save_reservation(reservation):
-    """Save or update a reservation"""
+    """Save or update a single reservation."""
     with get_db() as conn:
-        cursor = conn.cursor()
-        
-        if get_reservation_by_id(reservation['id']):
-            # Update existing
-            cursor.execute('''
-                UPDATE reservations SET
-                    name = ?, email = ?, phone = ?, checkIn = ?, checkOut = ?,
-                    guests = ?, bungalow = ?, notes = ?, status = ?,
-                    timestamp = ?, approved_date = ?, rejected_date = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (
-                reservation['name'],
-                reservation['email'],
-                reservation['phone'],
-                reservation['checkIn'],
-                reservation['checkOut'],
-                reservation['guests'],
-                reservation['bungalow'],
-                reservation.get('notes', ''),
-                reservation.get('status', 'pending'),
-                reservation.get('timestamp', datetime.now().isoformat()),
-                reservation.get('approved_date'),
-                reservation.get('rejected_date'),
-                reservation['id']
-            ))
-        else:
-            # Insert new
-            cursor.execute('''
-                INSERT INTO reservations 
-                (id, name, email, phone, checkIn, checkOut, guests, bungalow, notes, status, timestamp, approved_date, rejected_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                reservation['id'],
-                reservation['name'],
-                reservation['email'],
-                reservation['phone'],
-                reservation['checkIn'],
-                reservation['checkOut'],
-                reservation['guests'],
-                reservation['bungalow'],
-                reservation.get('notes', ''),
-                reservation.get('status', 'pending'),
-                reservation.get('timestamp', datetime.now().isoformat()),
-                reservation.get('approved_date'),
-                reservation.get('rejected_date')
-            ))
-        
+        _write_reservation(conn, reservation)
         conn.commit()
+
+
+def _has_conflict(conn, reservation):
+    return conn.execute(
+        "SELECT 1 FROM reservations WHERE bungalow=? AND status='approved' "
+        "AND id != ? AND checkIn < ? AND checkOut > ? LIMIT 1",
+        (reservation['bungalow'], reservation['id'], reservation['checkOut'], reservation['checkIn']),
+    ).fetchone() is not None
+
+
+def create_pending_reservation(reservation):
+    """Serialize the conflict check and insert against simultaneous approvals."""
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        if _has_conflict(conn, reservation):
+            raise ValueError('Reservation dates conflict')
+        pending = dict(reservation, status='pending')
+        _write_reservation(conn, pending)
+        conn.commit()
+
+
+def transition_reservation(reservation_id, status):
+    """Atomically decide a pending request and reject overlapping approvals."""
+    if status not in ('approved', 'rejected'):
+        raise ValueError('Unsupported status transition')
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        row = conn.execute('SELECT * FROM reservations WHERE id=?', (reservation_id,)).fetchone()
+        if row is None:
+            return None
+        reservation = dict(row)
+        if reservation['status'] != 'pending':
+            raise ValueError('Reservation already decided')
+        if status == 'approved' and _has_conflict(conn, reservation):
+            raise ValueError('Reservation dates conflict')
+        date_column = 'approved_date' if status == 'approved' else 'rejected_date'
+        timestamp = datetime.now().isoformat()
+        conn.execute(f'UPDATE reservations SET status=?, {date_column}=?, updated_at=CURRENT_TIMESTAMP WHERE id=?',
+                     (status, timestamp, reservation_id))
+        conn.commit()
+        reservation.update(status=status, **{date_column: timestamp})
+        return reservation
+
 
 def save_reservations(reservations):
     """Save multiple reservations (for batch operations)"""
@@ -186,28 +199,9 @@ def save_reservations(reservations):
         conn.commit()
 
 def update_reservation_status(reservation_id, status):
-    """Update reservation status"""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        
-        # Determine which date field to update
-        if status == 'approved':
-            cursor.execute('''
-                UPDATE reservations SET status = ?, approved_date = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (status, datetime.now().isoformat(), reservation_id))
-        elif status == 'rejected':
-            cursor.execute('''
-                UPDATE reservations SET status = ?, rejected_date = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (status, datetime.now().isoformat(), reservation_id))
-        else:
-            cursor.execute('''
-                UPDATE reservations SET status = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (status, reservation_id))
-        
-        conn.commit()
+    """Use the same conflict-safe transition for all admin status changes."""
+    return transition_reservation(reservation_id, status)
+
 
 def get_reservations_by_bungalow(bungalow):
     """Get all reservations for a specific bungalow"""
@@ -253,12 +247,17 @@ def migrate_from_json():
             if 'id' not in res or not res['id']:
                 res['id'] = str(uuid.uuid4())
         
-        # Save to database
-        save_reservations(reservations)
-        
-        # Backup JSON file
+        # Preserve the source backup before committing the import transaction.
         backup_file = 'reservations.json.backup'
-        os.rename(json_file, backup_file)
+        if os.path.exists(backup_file):
+            raise FileExistsError('Migration backup already exists; inspect it before retrying.')
+        with get_db() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            for reservation in reservations:
+                if conn.execute('SELECT 1 FROM reservations WHERE id=?', (reservation['id'],)).fetchone() is None:
+                    _write_reservation(conn, reservation)
+            os.rename(json_file, backup_file)
+            conn.commit()
         
         print(f"✅ Successfully migrated {len(reservations)} reservations from JSON to SQLite")
         print(f"   Original file backed up as: {backup_file}")

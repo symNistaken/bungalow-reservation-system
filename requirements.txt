@@ -6,3 +6,7 @@ Flask-CORS==4.0.0
 python-dotenv==1.0.0
 pytz==2024.1
 
+
+Flask-WTF==1.2.2
+waitress==3.0.2
+redis==5.0.1

@@ -12,6 +12,8 @@ from logging.handlers import RotatingFileHandler
 from functools import wraps
 import uuid
 import re
+import secrets
+from html import escape
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -19,7 +21,7 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_talisman import Talisman
 import pytz
 
@@ -31,12 +33,37 @@ app = Flask(__name__)
 # Load environment variables from .env file
 load_dotenv()
 
-# Enable CORS
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# Browser clients use same-origin requests; do not expose private APIs via wildcard CORS.
+environment = os.environ.get('APP_ENV', 'development')
+if environment not in ('development', 'production'):
+    raise RuntimeError('APP_ENV must be development or production.')
+PRODUCTION = environment == 'production'
+secret_key = os.environ.get('SECRET_KEY')
+admin_password = os.environ.get('ADMIN_PASSWORD')
+if not admin_password or admin_password == 'admin123':
+    raise RuntimeError('Set a non-default ADMIN_PASSWORD before starting the application.')
+if PRODUCTION and (not secret_key or len(secret_key) < 32 or secret_key == 'dev-secret-key-change-in-production'):
+    raise RuntimeError('Production requires a random SECRET_KEY of at least 32 characters.')
+if PRODUCTION and (len(admin_password) < 12 or not os.environ.get('RATELIMIT_STORAGE_URI', '').startswith(('redis://', 'rediss://'))):
+    raise RuntimeError('Production requires a 12+ character admin password and shared rate-limit storage.')
+app.config.update(
+    SECRET_KEY=secret_key or secrets.token_hex(32),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=PRODUCTION,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+    MAX_CONTENT_LENGTH=64 * 1024,
+)
+CSRFProtect(app)
+
+@app.errorhandler(CSRFError)
+def csrf_error(error):
+    return jsonify({'message': 'Güvenlik doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin.'}), 400
 
 # Security Headers with Talisman
 Talisman(app, 
-    force_https=False,  # Set to True in production
+    force_https=PRODUCTION,
+    session_cookie_secure=PRODUCTION,
     strict_transport_security=True,
     strict_transport_security_max_age=31536000,
     content_security_policy={
@@ -53,7 +80,8 @@ Talisman(app,
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "memory://"),
 )
 
 # Configure Logging
@@ -71,9 +99,7 @@ file_handler.setLevel(logging.DEBUG)
 # Console handler with UTF-8 encoding
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
-if hasattr(console_handler, 'stream'):
-    import io
-    console_handler.stream = io.TextIOWrapper(console_handler.stream.buffer, encoding='utf-8')
+# Use the existing stream; replacing stderr can close the caller's stream.
 
 # Formatter
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -83,11 +109,6 @@ console_handler.setFormatter(formatter)
 # Add handlers
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
-
-# Secret Key Configuration
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-if app.secret_key == 'dev-secret-key-change-in-production':
-    logger.warning("SECRET_KEY .env dosyasında ayarlanmamış! Development ortamında çalışıyor.")
 
 # Timezone Configuration
 TIMEZONE_STR = os.environ.get('TIMEZONE', 'Europe/Istanbul')
@@ -105,8 +126,8 @@ def get_local_datetime():
 EMAIL_SENDER = os.environ.get('EMAIL_SENDER')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
-SMTP_SERVER = 'smtp.gmail.com'
-SMTP_PORT = 587
+SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 
 # Validate email configuration
 if not EMAIL_SENDER or not EMAIL_PASSWORD or not ADMIN_EMAIL:
@@ -119,7 +140,7 @@ RESERVATIONS_FILE = 'reservations.json'
 # Admin credentials with password hashing
 # In production, use environment variables for admin credentials
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD_HASH = generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'admin123'))
+ADMIN_PASSWORD_HASH = generate_password_hash(admin_password)
 
 # Store hashed passwords
 ADMIN_CREDENTIALS = {
@@ -141,7 +162,7 @@ def save_reservations(reservations):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'admin_logged_in' not in session:
+        if session.get('admin_logged_in') is not True:
             return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -275,7 +296,7 @@ def send_email(to_email, subject, html_body):
         
         # Connect and send
         logger.info(f"Email gönderiliyor: {to_email} -> {subject}")
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.starttls()
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.send_message(msg)
@@ -296,6 +317,7 @@ def send_email(to_email, subject, html_body):
 
 def send_admin_reservation_notification(reservation):
     """Send email to admin when new reservation arrives"""
+    reservation = {key: escape(value) if isinstance(value, str) else value for key, value in reservation.items()}
     check_in = datetime.strptime(reservation['checkIn'], '%Y-%m-%d').strftime('%d.%m.%Y')
     check_out = datetime.strptime(reservation['checkOut'], '%Y-%m-%d').strftime('%d.%m.%Y')
     nights = (datetime.strptime(reservation['checkOut'], '%Y-%m-%d') - 
@@ -345,6 +367,7 @@ def send_admin_reservation_notification(reservation):
 
 def send_customer_confirmation_email(reservation, approved=True):
     """Send confirmation or rejection email to customer"""
+    reservation = {key: escape(value) if isinstance(value, str) else value for key, value in reservation.items()}
     check_in = datetime.strptime(reservation['checkIn'], '%Y-%m-%d').strftime('%d.%m.%Y')
     check_out = datetime.strptime(reservation['checkOut'], '%Y-%m-%d').strftime('%d.%m.%Y')
     
@@ -405,15 +428,21 @@ def home():
     return render_template('index.html')
 
 @app.route('/admin/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")  # 5 login attempts per minute
+@limiter.limit("5 per minute", methods=["POST"])  # 5 login attempts per minute
 def admin_login():
     if request.method == 'POST':
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'message': 'JSON nesnesi gerekli.'}), 400
         username = data.get('username')
         password = data.get('password')
+        if not isinstance(username, str) or not isinstance(password, str):
+            return jsonify({'message': 'Kullanıcı adı ve şifre metin olmalı.'}), 400
         
         if username in ADMIN_CREDENTIALS and check_password_hash(ADMIN_CREDENTIALS[username], password):
+            session.clear()
             session['admin_logged_in'] = True
+            session.permanent = True
             logger.info(f"Admin giriş başarılı: {username}")
             return jsonify({'success': True}), 200
         else:
@@ -427,9 +456,10 @@ def admin_login():
 def admin_panel():
     return render_template('admin_panel.html')
 
-@app.route('/admin/logout')
+@app.route('/admin/logout', methods=['POST'])
+@login_required
 def admin_logout():
-    session.pop('admin_logged_in', None)
+    session.clear()
     return redirect(url_for('admin_login'))
 
 @app.route('/reservation')
@@ -448,13 +478,18 @@ def gallery():
 @limiter.limit("10 per hour")  # 10 new reservations per hour per IP
 def create_reservation():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'message': 'JSON nesnesi gerekli.'}), 400
         
         required_fields = ['name', 'email', 'phone', 'checkIn', 'checkOut', 'guests', 'bungalow']
         if not all(field in data for field in required_fields):
             logger.warning("Eksik alanlar ile rezervasyon isteği")
             return jsonify({'message': 'Tüm gerekli alanlar doldurulmalıdır.'}), 400
         
+        if any(not isinstance(data[field], str) for field in ('name', 'email', 'phone', 'checkIn', 'checkOut', 'bungalow')) or (data.get('notes') is not None and not isinstance(data['notes'], str)):
+            return jsonify({'message': 'Geçersiz alan türü.'}), 400
+
         # Validate name
         if not validate_name(data['name']):
             logger.warning(f"Geçersiz ad soyad: {data.get('name')}")
@@ -508,7 +543,7 @@ def create_reservation():
         data['status'] = 'pending'  # New reservations are pending approval
         
         # Save to database using database module
-        db.save_reservation(data)
+        db.create_pending_reservation(data)
         
         logger.info(f"Yeni rezervasyon: ID={data['id']}, {data['name']}, {data['bungalow']}, {data['checkIn']}-{data['checkOut']}")
         
@@ -520,6 +555,8 @@ def create_reservation():
             'reservation_id': data['id']
         }), 201
         
+    except ValueError:
+        return jsonify({'message': 'Seçilen tarihler uygun değildir.'}), 409
     except Exception as e:
         logger.exception(f"Rezervasyon oluşturma hatası: {str(e)}")
         return jsonify({'message': 'Bir hata oluştu. Lütfen tekrar deneyiniz.'}), 500
@@ -551,71 +588,28 @@ def get_pending_reservations():
 @app.route('/api/reservations/<reservation_id>/approve', methods=['POST'])
 @login_required
 def approve_reservation(reservation_id):
-    """Approve a pending reservation"""
     try:
-        reservations = load_reservations()
-        
-        # Find reservation by ID instead of index
-        res_index = None
-        for idx, res in enumerate(reservations):
-            if res.get('id') == reservation_id:
-                res_index = idx
-                break
-        
-        if res_index is None:
-            logger.warning(f"Onaylama hatası: Rezervasyon bulunamadı - ID={reservation_id}")
-            return jsonify({'message': 'Rezervasyon bulunamadı.'}), 404
-        
-        reservations[res_index]['status'] = 'approved'
-        reservations[res_index]['approved_date'] = get_local_datetime().isoformat()
-        
-        save_reservations(reservations)
-        
-        logger.info(f"Rezervasyon onaylandı: ID={reservation_id}, Müşteri={reservations[res_index].get('name')}")
-        
-        # Send confirmation email to customer
-        send_customer_confirmation_email(reservations[res_index], approved=True)
-        
-        return jsonify({
-            'message': 'Rezervasyon onaylandı!',
-            'reservation': reservations[res_index]
-        }), 200
-    except Exception as e:
-        logger.exception(f"Rezervasyon onaylama hatası: {str(e)}")
-        return jsonify({'message': 'Bir hata oluştu.'}), 500
+        reservation = db.transition_reservation(reservation_id, 'approved')
+    except ValueError:
+        return jsonify({'message': 'Bu tarihler artık uygun değil veya talep zaten karara bağlandı.'}), 409
+    if reservation is None:
+        return jsonify({'message': 'Rezervasyon bulunamadı.'}), 404
+    send_customer_confirmation_email(reservation, approved=True)
+    return jsonify({'message': 'Rezervasyon onaylandı!', 'reservation': reservation}), 200
+
 
 @app.route('/api/reservations/<reservation_id>/reject', methods=['POST'])
 @login_required
 def reject_reservation(reservation_id):
-    """Reject a pending reservation"""
     try:
-        reservations = load_reservations()
-        
-        # Find reservation by ID instead of index
-        res_index = None
-        for idx, res in enumerate(reservations):
-            if res.get('id') == reservation_id:
-                res_index = idx
-                break
-        
-        if res_index is None:
-            logger.warning(f"Red etme hatası: Rezervasyon bulunamadı - ID={reservation_id}")
-            return jsonify({'message': 'Rezervasyon bulunamadı.'}), 404
-        
-        reservations[res_index]['status'] = 'rejected'
-        reservations[res_index]['rejected_date'] = get_local_datetime().isoformat()
-        
-        save_reservations(reservations)
-        
-        logger.info(f"Rezervasyon reddedildi: ID={reservation_id}, Müşteri={reservations[res_index].get('name')}")
-        
-        # Send rejection email to customer
-        send_customer_confirmation_email(reservations[res_index], approved=False)
-        
-        return jsonify({'message': 'Rezervasyon reddedildi.'}), 200
-    except Exception as e:
-        logger.exception(f"Rezervasyon red etme hatası: {str(e)}")
-        return jsonify({'message': 'Bir hata oluştu.'}), 500
+        reservation = db.transition_reservation(reservation_id, 'rejected')
+    except ValueError:
+        return jsonify({'message': 'Talep zaten karara bağlandı.'}), 409
+    if reservation is None:
+        return jsonify({'message': 'Rezervasyon bulunamadı.'}), 404
+    send_customer_confirmation_email(reservation, approved=False)
+    return jsonify({'message': 'Rezervasyon reddedildi.'}), 200
+
 
 @app.route('/api/booked-dates', methods=['GET'])
 def get_booked_dates_api():
@@ -694,6 +688,6 @@ if __name__ == '__main__':
         logger.info("JSON dosyasından SQLite'ye veri taşınıyor...")
         db.migrate_from_json()
     
-    app.run(debug=True)
+    app.run(debug=False, host='127.0.0.1')
 
 

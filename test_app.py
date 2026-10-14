@@ -4,9 +4,13 @@ Unit tests for Bungalow Reservation System
 """
 
 import unittest
+import re
 import json
 import os
 from datetime import datetime, timedelta
+os.environ.setdefault('ADMIN_PASSWORD', 'test-only-strong-password')
+os.environ.setdefault('SECRET_KEY', 'test-only-secret-key-with-32-characters')
+
 from app import (
     app, validate_email, validate_phone, validate_name, validate_guests,
     validate_bungalow, validate_date, validate_date_range, validate_notes,
@@ -230,7 +234,9 @@ class APITestCase(unittest.TestCase):
         ]:
             with self.subTest(method=method, path=path):
                 with app.test_client() as client:
-                    response = getattr(client, method)(path)
+                    page = client.get('/reservation').get_data(as_text=True)
+                    token = re.search(r'name="csrf-token" content="([^"]+)"', page).group(1)
+                    response = getattr(client, method)(path, headers={'X-CSRFToken': token})
                 self.assertEqual(response.status_code, 302)
                 self.assertTrue(response.headers['Location'].endswith('/admin/login'))
 
@@ -249,6 +255,20 @@ class APITestCase(unittest.TestCase):
         cls.app.config['TESTING'] = True
         cls.client = cls.app.test_client()
     
+    def setUp(self):
+        self.client = self.app.test_client()
+        response = self.client.get('/reservation')
+        token = re.search(r'name="csrf-token" content="([^"]+)"', response.get_data(as_text=True)).group(1)
+        self.client.environ_base['HTTP_X_CSRFTOKEN'] = token
+
+    def test_missing_csrf_rejected(self):
+        with app.test_client() as client:
+            response = client.post('/admin/login', json={'username': 'admin', 'password': 'test-only-strong-password'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_logout_requires_post(self):
+        self.assertEqual(self.client.get('/admin/logout').status_code, 405)
+
     def test_home_page(self):
         """Test home page loads"""
         response = self.client.get('/')
