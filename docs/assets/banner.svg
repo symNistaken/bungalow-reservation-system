@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="280" viewBox="0 0 1100 280" role="img" aria-labelledby="title desc">
+<title id="title">BUNGALOW</title><desc id="desc">Rezervasyon yönetimi, tek bir yerde. FLASK · SQLITE · CALENDAR</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1220"/><stop offset="1" stop-color="#18243b"/></linearGradient><linearGradient id="accent"><stop stop-color="#34d399"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+<rect width="1100" height="280" rx="22" fill="url(#bg)"/>
+<circle cx="1020" cy="12" r="210" fill="#34d399" opacity=".06"/><circle cx="1010" cy="250" r="150" fill="#22d3ee" opacity=".07"/>
+<path d="M720 0v280M820 0v280M920 0v280M1020 0v280M720 60h380M720 140h380M720 220h380" stroke="#dbeafe" opacity=".045"/>
+<rect x="42" y="35" width="4" height="206" rx="2" fill="url(#accent)"/>
+<text x="66" y="60" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="3" fill="#34d399">REZERVASYON</text>
+<text x="66" y="123" font-family="Arial, sans-serif" font-size="48" font-weight="700" letter-spacing="-1" fill="#f8fafc">BUNGALOW</text>
+<text x="68" y="162" font-family="Arial, sans-serif" font-size="21" fill="#b8c6da">Rezervasyon yönetimi, tek bir yerde</text>
+<rect x="66" y="193" width="420" height="37" rx="18" fill="#ffffff" opacity=".05"/>
+<text x="84" y="217" font-family="Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="2" fill="#dce8f8">FLASK · SQLITE · CALENDAR</text>
+<g transform="translate(868 37)" fill="none" stroke="url(#accent)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 88 82 30l72 58M28 77v77h110V77M66 154v-49h32v49"/></g>
+</svg>

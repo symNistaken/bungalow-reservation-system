@@ -1,5 +1,5 @@
 # Backend utility: Berkay Seyman (2026)
-# Copyright (c) 2026 Berkay Seyman. All rights reserved.
+# Copyright (c) 2026 Berkay Seyman. SPDX-License-Identifier: MIT
 
 """
 SQLite Database Inspector

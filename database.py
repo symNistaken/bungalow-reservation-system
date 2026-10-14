@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Backend/database implementation: Berkay Seyman (2026)
-# Copyright (c) 2026 Berkay Seyman. All rights reserved.
-# Commercial use of this backend requires prior written permission.
+# Copyright (c) 2026 Berkay Seyman. SPDX-License-Identifier: MIT
+# MIT applies to Berkay Seyman contributions; see LICENSE and LICENSE-SCOPE.md.
 
 """
 Database module for Bungalow Reservation System

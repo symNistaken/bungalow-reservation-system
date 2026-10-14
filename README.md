@@ -1,5 +1,12 @@
 # Bungalow Rezervasyon Sistemi
 
+![BUNGALOW — proje tanıtım görseli](docs/assets/banner.svg)
+
+[![Python checks](https://github.com/symNistaken/bungalow-reservation-system/actions/workflows/checks.yml/badge.svg)](https://github.com/symNistaken/bungalow-reservation-system/actions/workflows/checks.yml)
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+![Flask](https://img.shields.io/badge/Flask-Flask-242938?logo=flask&logoColor=white)
+[![MIT contributions](https://img.shields.io/badge/License-MIT%20contributions-green.svg)](LICENSE-SCOPE.md)
+
 Flask ve SQLite ile geliştirilmiş bungalov rezervasyon uygulaması. Müşteriler rezervasyon talebi oluşturabilir; yöneticiler talepleri inceleyip onaylayabilir veya reddedebilir.
 
 Bu depo, [CGhost1908/bungalow-reservation-system](https://github.com/CGhost1908/bungalow-reservation-system) projesinin fork'udur. Frontend kökeni ve katkı sahiplerinin hakları korunur; backend ve yönetim panelindeki Berkay Seyman katkıları aşağıda açıklanmıştır.
@@ -15,6 +22,17 @@ Bu depo, [CGhost1908/bungalow-reservation-system](https://github.com/CGhost1908/
 - SQLite saklama, eski JSON kayıtları için taşıma yardımcıları ve loglama.
 
 > Yerel geliştirme projesidir. Oturum açma tek başına CSRF koruması sağlamaz; mevcut uygulamada CSRF token doğrulaması bulunmaz.
+
+## Akış
+
+```mermaid
+flowchart LR
+    A[Müşteri formu] --> B[Doğrulama]
+    B --> C[SQLite: bekleyen talep]
+    C --> D[Yönetici oturumu]
+    D --> E[Onay veya red]
+    E --> F[Takvim ve e-posta bildirimi]
+```
 
 ## Kurulum
 
@@ -169,7 +187,9 @@ E-posta testi SMTP'ye bağlanır ve yapılandırılmış adreslere bildirim gön
 
 Frontend kökeni [CGhost1908/bungalow](https://github.com/CGhost1908/bungalow) projesidir. Rezervasyon backend'i, SQLite entegrasyonu ve yönetim paneli **Berkay Seyman** tarafından geliştirilmiştir.
 
-© 2026 Berkay Seyman. Berkay Seyman'a ait backend ve yönetim paneli katkılarının tüm hakları saklıdır. GitHub'da görüntülenebilir olmaları genel veya ticari kullanım izni vermez; kullanım için önceden yazılı izin alınmalıdır. Frontend ve diğer katkıların hakları kendi sahiplerine aittir. GitHub hizmet koşulları ve yürürlükteki hukuk kapsamındaki haklar saklıdır.
+**Berkay Seyman'a ait özgün katkılar [MIT Lisansı](LICENSE) ile yayımlanır.** Bu katkıların ticari kullanımı, değiştirilmesi ve dağıtımı serbesttir; telif ve lisans metni korunmalıdır.
+
+Fork'tan gelen frontend ve diğer geliştiricilerin katkıları yeniden lisanslanmaz. MIT kapsamı ve üçüncü taraf hakları için [lisans kapsamı](LICENSE-SCOPE.md) belgesine bakın.
 
 ## İletişim ve ek belgeler
 
@@ -178,3 +198,6 @@ Frontend kökeni [CGhost1908/bungalow](https://github.com/CGhost1908/bungalow) p
 - Eren Batı Altunkapak: erenbatialtunkapak@gmail.com
 
 [E-posta kurulumu](EMAIL_SETUP.md), [yönetici kurulumu](ADMIN_SETUP.md) ve [veritabanı inceleme](DATABASE_INSPECTION.md) belgeleri ek geliştirme notlarıdır. Tarihsel notlardaki güvenlik ve üretime hazır olma iddialarını bu README'deki mevcut sınırlarla birlikte değerlendir.
+## Otomatik kontroller
+
+[GitHub Actions](https://github.com/symNistaken/bungalow-reservation-system/actions) her push ve pull request için sözdizimi ve uygulama testlerini çalıştırır. Gerçek SMTP gönderimi bu testlerin dışında kalır.
