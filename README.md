@@ -1,232 +1,180 @@
-# 🏠 Bungalow Rezervasyon Sistemi
+# Bungalow Rezervasyon Sistemi
 
-Flask tabanlı profesyonel bungalow/tatil evi rezervasyon yönetim platformu. Admin paneli, email bildirimleri, takvim görünümü ve tam veri validasyonu ile birlikte gelir.
+Flask ve SQLite ile geliştirilmiş bungalov rezervasyon uygulaması. Müşteriler rezervasyon talebi oluşturabilir; yöneticiler talepleri inceleyip onaylayabilir veya reddedebilir.
 
-## ✨ Özellikler
+Bu depo, [CGhost1908/bungalow-reservation-system](https://github.com/CGhost1908/bungalow-reservation-system) projesinin fork'udur. Frontend kökeni ve katkı sahiplerinin hakları korunur; backend ve yönetim panelindeki Berkay Seyman katkıları aşağıda açıklanmıştır.
 
-- 🔐 **Güvenli Admin Paneli**: Oturum yönetimi ve password hashing
-- 📅 **İnteraktif Takvim**: FullCalendar entegrasyonu, renkli tarih gösterimi
-- 📧 **Email Bildirimleri**: Otomatik rezervasyon ve durum değişikliği bildirimleri
-- ✅ **Akıllı Validasyon**: Email, telefon, tarih ve çakışma kontrolü
-- 👥 **Admin Dashboard**: İstatistikler, beklemede rezervasyonlar, onaylanmış tarihler
-- 🌍 **Çok Bungalov Desteği**: Her bungalov için ayrı tarih yönetimi
-- 📱 **Responsive Tasarım**: Mobile-friendly arayüz
+## Özellikler
 
-## 🚀 Kurulum
+- Bungalov seçimi, giriş/çıkış tarihleri ve misafir bilgileriyle rezervasyon talebi.
+- Yönetici girişi, rezervasyon listesi ve onay/red işlemleri.
+- FullCalendar tabanlı yönetici takvimi.
+- E-posta, telefon, tarih aralığı ve misafir sayısı kontrolleri.
+- Bungalov başına onaylanmış rezervasyonlarla tarih çakışması kontrolü.
+- Gmail SMTP üzerinden yönetici ve müşteri bildirimleri.
+- SQLite saklama, eski JSON kayıtları için taşıma yardımcıları ve loglama.
 
-### 1. Gereksinimler
+> Yerel geliştirme projesidir. Oturum açma tek başına CSRF koruması sağlamaz; mevcut uygulamada CSRF token doğrulaması bulunmaz.
 
-- Python 3.8+
-- pip paket yöneticisi
+## Kurulum
 
-### 2. Bağımlılıkları Kurun
+Python 3.10 ve Git ile yerel çalışma için:
 
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/symNistaken/bungalow-reservation-system.git
+cd bungalow-reservation-system
+python -m venv .venv
 ```
 
-### 3. Ortam Değişkenlerini Ayarlayın
+Windows PowerShell:
 
-`.env.example` dosyasından `.env` dosyası oluşturun:
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+
+Linux/macOS:
 
 ```bash
+.venv/bin/python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-`.env` dosyasını düzenleyin:
+`.env` dosyasına yönetici ve oturum ayarlarını ekle; e-posta şablonundaki yer tutucuları kendi bilgilerinle değiştir:
 
-```env
-# Email Configuration
-EMAIL_SENDER=your-email@gmail.com
-EMAIL_PASSWORD=your-app-password-16-chars
-ADMIN_EMAIL=admin@example.com
-
-# Flask Secret Key
-SECRET_KEY=your-random-secret-key-here
-
-# Admin Credentials
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
+```dotenv
+SECRET_KEY=YOUR_RANDOM_SECRET_KEY
+ADMIN_USERNAME=YOUR_ADMIN_USERNAME
+ADMIN_PASSWORD=YOUR_STRONG_ADMIN_PASSWORD
+TIMEZONE=Europe/Istanbul
+EMAIL_SENDER=YOUR_GMAIL_ADDRESS
+EMAIL_PASSWORD=YOUR_GMAIL_APP_PASSWORD
+ADMIN_EMAIL=YOUR_NOTIFICATION_EMAIL
 ```
 
-#### Gmail Kurulumu
-
-1. Google Account'ta [2-Step Verification](https://support.google.com/accounts/answer/185839) aktif edin
-2. [App Passwords](https://myaccount.google.com/apppasswords) sayfasında Google Account için şifre oluşturun
-3. App Password'ü `.env` dosyasında `EMAIL_PASSWORD` olarak ayarlayın
-
-Detaylı talimatlar için: [EMAIL_SETUP.md](EMAIL_SETUP.md)
-
-### 4. Uygulamayı Başlatın
+Rastgele oturum anahtarı üretmek için:
 
 ```bash
-python app.py
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-Tarayıcıda açın: `http://localhost:5000`
+Gmail için [iki aşamalı doğrulama](https://support.google.com/accounts/answer/185839) ve [uygulama şifresi](https://myaccount.google.com/apppasswords) kullan. Normal hesap şifreni paylaşma. E-posta ayarları eksikse bildirimler çalışmaz; uygulama terminalde uyarı verir. SMTP sunucusu mevcut kodda `smtp.gmail.com:587` olarak sabittir; `.env.example` içindeki isteğe bağlı SMTP ayarları kod tarafından okunmaz.
 
-## 📖 Kullanım
+Windows:
 
-### 👤 Müşteri
-
-1. Ana sayfadan "Rezervasyon Yap"ı tıklayın
-2. Bilgilerinizi doldurun:
-   - Ad Soyad
-   - Email
-   - Telefon
-   - Giriş/Çıkış Tarihleri
-   - Bungalov Seçimi
-   - Misafir Sayısı
-   - Notlar (opsiyonel)
-3. Forma gönderin
-4. Admin onayını bekleyin (email ile bilgilendirileceksiniz)
-
-### 🔐 Admin Panel
-
-Admin paneline erişim: `http://localhost:5000/admin`
-
-**Varsayılan Kimlik Bilgileri:**
-- Kullanıcı Adı: `admin`
-- Şifre: `admin123`
-
-**⚠️ Üretim Ortamında Değiştirin!**
-
-#### Admin Paneli Özellikleri
-
-- **Beklemede**: Onay bekleyen rezervasyonlar
-- **Onaylanan**: Onaylanan rezervasyonlar
-- **Tümü**: Tüm rezervasyonlar
-- **Takvim**: Bungalov başına tarih görünümü ve müşteri isimleri
-
-## 🏗️ Proje Yapısı
-
-```
-bungalow-main/
-├── app.py                          # Ana Flask uygulaması
-├── requirements.txt                # Python bağımlılıkları
-├── reservations.json              # Rezervasyon veritabanı
-├── .env                           # Ortam değişkenleri (gizli)
-├── .env.example                   # .env şablonu
-├── README.md                      # Bu dosya
-├── EMAIL_SETUP.md                 # Email kurulum rehberi
-├── ADMIN_SETUP.md                 # Admin paneli rehberi
-│
-├── templates/                     # HTML şablonları
-│   ├── index.html                 # Ana sayfa
-│   ├── bungalows.html            # Bungalov listesi
-│   ├── gallery.html              # Galeri
-│   ├── reservation.html          # Rezervasyon formu
-│   ├── admin_login.html          # Admin giriş
-│   └── admin_panel.html          # Admin dashboard
-│
-└── static/                        # Statik dosyalar
-    ├── style.css                  # Ana stil
-    ├── script.js                  # Ana script
-    └── images/                    # Resim dosyaları
+```powershell
+.\.venv\Scripts\python.exe app.py
 ```
 
-## 🔌 API Endpoints
+Linux/macOS:
 
-### Rezervasyon
-
-- `POST /api/reservation` - Yeni rezervasyon oluştur
-- `GET /api/reservations` - Tüm rezervasyonları getir
-- `GET /api/reservations/pending` - Beklemede olan rezervasyonlar
-- `POST /api/reservations/<id>/approve` - Rezervasyonu onayla
-- `POST /api/reservations/<id>/reject` - Rezervasyonu reddet
-
-### Takvim
-
-- `GET /api/booked-dates` - Tüm dolu tarihler
-- `GET /api/bungalow-dates/<bungalow>` - Belirli bungalov için tarihler
-
-## 🔒 Güvenlik
-
-- ✅ Werkzeug ile password hashing
-- ✅ CSRF koruması session'lar ile
-- ✅ Input validation (email, telefon, tarih)
-- ✅ Date conflict checking
-- ✅ Environment variables'da hassas veriler
-- ✅ UUID-based reservation IDs
-
-### Üretim Ayarları
-
-```python
-# app.py içinde:
-app.run(debug=False)  # Debug mode kapatın
+```bash
+.venv/bin/python app.py
 ```
 
-## 🐛 Sorun Giderme
+[http://localhost:5000](http://localhost:5000) adresini aç. Komutları depo kökünde çalıştır; SQLite dosyası ve loglar çalışma dizininde oluşur.
 
-### Email Gönderilmiyor
+## Kullanım
 
-1. `.env` dosyasını kontrol edin
-2. Gmail 2FA ve App Password aktif mi?
-3. Terminal'de hata mesajlarını kontrol edin
-4. `python test_email.py` çalıştırarak test edin
+**Müşteri:** `/reservation` sayfasında ad, e-posta, telefon, bungalov, misafir sayısı ve tarihleri doldur. Talep `pending` durumunda kaydedilir; yönetici kararı sonrasında bildirim gönderilmeye çalışılır.
 
-### Admin Paneline Giremiyorum
+**Yönetici:** `/admin/login` üzerinden `.env` içinde belirlediğin bilgilerle giriş yap. `/admin` sayfasında talepleri listele, takvimi incele ve onay/red işlemlerini yap.
 
-1. `.env` dosyasında `ADMIN_USERNAME` ve `ADMIN_PASSWORD` kontrol edin
-2. Browser cache'i temizleyin
-3. Cookies'i silin: Ayarlar > Çerezler > tümünü sil
+Yönetici bilgileri verilmezse kod `admin` / `admin123` varsayılanlarını kullanır. Gerçek kullanım öncesinde bunları ve varsayılan oturum anahtarını mutlaka değiştir.
 
-### Tarih Çakışmaları
+## Sayfalar ve API
 
-Sistem her bungalov için ayrı tarih kontrolü yapar. Eğer hala sorun yaşıyorsanız `reservations.json` dosyasında statüsü "rejected" olan eski rezervasyonları silebilirsiniz.
+| Yol | Yöntem | Erişim / amaç |
+| --- | --- | --- |
+| `/`, `/bungalows`, `/gallery` | GET | Genel sayfalar |
+| `/reservation` | GET | Rezervasyon formu |
+| `/admin/login` | GET, POST | Yönetici girişi |
+| `/admin`, `/admin/logout` | GET | Yönetici paneli / çıkış |
+| `/api/reservation` | POST | Herkese açık talep oluşturma |
+| `/api/reservations` | GET | Yönetici oturumu; tüm kayıtlar |
+| `/api/reservations/pending` | GET | Yönetici oturumu; bekleyen kayıtlar |
+| `/api/reservations/<id>/approve` | POST | Yönetici oturumu; onay |
+| `/api/reservations/<id>/reject` | POST | Yönetici oturumu; red |
+| `/api/booked-dates` | GET | Genel doluluk bilgisi; isteğe bağlı `bungalow` query alanı |
+| `/api/bungalow-dates/<bungalow>` | GET | Yönetici oturumu; durum ve misafir adları |
 
-## 📊 Veri Yapısı
-
-### Rezervasyon Nesnesi
+Yönetici oturumu gerektiren uç noktalar giriş yapılmamışsa `/admin/login` adresine yönlendirir. `/api/reservation` JSON gövdesinde şu alanları bekler:
 
 ```json
 {
-  "id": "uuid-string",
-  "name": "Müşteri Adı",
-  "email": "email@example.com",
+  "name": "Örnek Misafir",
+  "email": "guest@example.com",
   "phone": "05301234567",
-  "checkIn": "2024-12-25",
-  "checkOut": "2024-12-30",
-  "guests": 4,
-  "bungalow": "Bungalov Adı",
-  "notes": "Opsiyonel notlar",
-  "status": "pending/approved/rejected",
-  "timestamp": "2024-12-16T10:30:00",
-  "approved_date": "2024-12-16T10:35:00",
-  "rejected_date": null
+  "checkIn": "YYYY-MM-DD",
+  "checkOut": "YYYY-MM-DD",
+  "guests": 2,
+  "bungalow": "Bungalow 1",
+  "notes": "İsteğe bağlı not"
 }
 ```
 
-## 🚧 Gelecek Geliştirmeler
+Tarihleri gelecekteki gerçek tarihlerle, bungalov değerini arayüzdeki seçenekle değiştir. Giriş ve çıkış bugünden sonra olmalı; çıkış girişten sonra ve konaklama en fazla 90 gün olmalıdır. Misafir sayısı `1–20` aralığındadır. Doğrulama hataları `400`, onaylı rezervasyon çakışması `409` döndürür.
 
-- [ ] SQLite/PostgreSQL veritabanı entegrasyonu
-- [ ] WhatsApp bildirimleri
-- [ ] Fiyatlandırma ve ödeme sistemi
-- [ ] Email şablonları özelleştirme
-- [ ] Massal işlemler (export, import)
-- [ ] Tarih aralığı kopyalama
-- [ ] Unit tests
+## Veritabanı ve dosyalar
 
-## 📝 Geliştirici ve kullanım koşulları
+```text
+app.py                 Flask, doğrulama, yönetici oturumu ve bildirimler
+database.py            SQLite işlemleri ve JSON taşıma
+templates/             Müşteri ve yönetici sayfaları
+static/                CSS ve JavaScript
+.env.example           E-posta ortam şablonu
+requirements.txt       Python paketleri
+test_app.py            Doğrulama, veritabanı ve API testleri
+test_email.py          Gerçek SMTP bağlantı/bildirim testi
+inspect_db.py          Yerel veritabanını inceleme
+```
 
-Bu repo, [CGhost1908/bungalow](https://github.com/CGhost1908/bungalow) frontend projesinin fork’udur. Rezervasyon sistemi backend'i, SQLite veritabanı entegrasyonu ve yönetim paneli **Berkay Seyman** tarafından geliştirilmiştir.
+Asıl saklama dosyası **`reservations.db`**; `reservations.json` eski taşıma girdisidir. Veritabanı tabloları başlangıçta oluşturulur. `.env`, veritabanı ve loglar Git dışında tutulur. Rezervasyonlarda müşteri iletişim bilgileri bulunur; paylaşmadan önce veriyi temizle ve yedek al.
 
-Backend ve yönetim panelindeki Berkay Seyman'a ait katkıların telif hakları saklıdır (© 2026 Berkay Seyman). Bu kodun GitHub’da görüntülenebilmesi, bağımsız bir kullanım veya ticari kullanım izni verildiği anlamına gelmez. Backend'i veya yönetim panelini kendi projenizde kullanmak için önceden yazılı izin alın. Frontend ve diğer katkıların hakları kendi sahiplerine aittir.
+`static/images/` ve `static/videos/` Git tarafından yok sayılır; yerel görsel dosyaları klonda bulunmayabilir. Kullanacağın görselleri ilgili yollarına kendin yerleştir. Veritabanı dosyasını veya müşteri kayıtlarını hata raporuna yükleme.
 
+## Kontroller
 
-## 👨‍💻 Destek
+Paketler kurulduktan sonra, sanal ortamın Python'u ile depo kökünde:
 
-Sorunlar veya öneriler için lütfen iletişime geçin:
-- Email: berkayseyman@gmail.com
-- Admin: Berkay Seyman
+```bash
+python -m unittest test_app -v
+```
 
-- Email: bilalberkeceylan@gmail.com
-- Admin: Bilal Berke Ceylan
+Bu testler doğrulama, SQLite işlemleri ve API davranışlarını kapsar. Test içe aktarması yerel veritabanı/log dosyaları oluşturabilir; canlı veritabanının bulunduğu dizinde çalıştırma. E-posta testini yalnızca kendi hesabın ve alıcılarınla çalıştır:
 
-- Email: erenbatialtunkapak@gmail.com
-- Admin: Eren Batı Altunkapak
+```bash
+python test_email.py
+```
 
----
+E-posta testi SMTP'ye bağlanır ve yapılandırılmış adreslere bildirim gönderebilir; çevrimdışı test değildir.
 
-**Sürüm**: 1.0.8
-**Son Güncelleme**: Şubat 2026
+## Güvenlik ve mevcut sınırlar
+
+- Yönetici listeleri, onay/red uç noktaları ve misafir isimli takvim, yönetici oturumu gerektirir.
+- Şifreler Werkzeug ile hash'lenir; rate limiting ve güvenlik başlığı bileşenleri bulunur.
+- CSRF token doğrulaması henüz uygulanmaz. Oturum kontrolü bu açığı tek başına çözmez.
+- Kod geliştirme sunucusunu `debug=True` ile başlatır; üretim için debug kapatılmalı, uygun WSGI sunucusu ve HTTPS kullanılmalıdır.
+- CORS API için geniş tanımlıdır; üretimde izinli origin'lere sınırlandırılmalıdır.
+- Tarih kontrolü onaylı kayıtları esas alır; bekleyen talepler aynı tarihlere gelebilir. Onay sırasında çakışma/concurrency güvenliği ayrıca güçlendirilmelidir.
+
+## Sorun giderme
+
+- **E-posta gitmiyor:** `.env`, Gmail uygulama şifresi, alıcı adresi ve terminal loglarını kontrol et.
+- **Yönetici girişi başarısız:** `.env` değerlerini değiştirince sunucuyu yeniden başlat.
+- **Görsel eksik:** Şablonun beklediği `static/images/` yolunda dosya bulunduğunu kontrol et.
+- **Veri görünmüyor:** Komutları aynı depo kökünden çalıştır; `reservations.db` çalışma dizinine bağlıdır.
+
+## Katkılar ve kullanım koşulları
+
+Frontend kökeni [CGhost1908/bungalow](https://github.com/CGhost1908/bungalow) projesidir. Rezervasyon backend'i, SQLite entegrasyonu ve yönetim paneli **Berkay Seyman** tarafından geliştirilmiştir.
+
+© 2026 Berkay Seyman. Berkay Seyman'a ait backend ve yönetim paneli katkılarının tüm hakları saklıdır. GitHub'da görüntülenebilir olmaları genel veya ticari kullanım izni vermez; kullanım için önceden yazılı izin alınmalıdır. Frontend ve diğer katkıların hakları kendi sahiplerine aittir. GitHub hizmet koşulları ve yürürlükteki hukuk kapsamındaki haklar saklıdır.
+
+## İletişim ve ek belgeler
+
+- Berkay Seyman: berkayseyman@gmail.com
+- Bilal Berke Ceylan: bilalberkeceylan@gmail.com
+- Eren Batı Altunkapak: erenbatialtunkapak@gmail.com
+
+[E-posta kurulumu](EMAIL_SETUP.md), [yönetici kurulumu](ADMIN_SETUP.md) ve [veritabanı inceleme](DATABASE_INSPECTION.md) belgeleri ek geliştirme notlarıdır. Tarihsel notlardaki güvenlik ve üretime hazır olma iddialarını bu README'deki mevcut sınırlarla birlikte değerlendir.

@@ -219,6 +219,28 @@ class DatabaseTestCase(unittest.TestCase):
 
 class APITestCase(unittest.TestCase):
     """Test API endpoints"""
+
+    def test_admin_endpoints_require_login(self):
+        for method, path in [
+            ('get', '/api/reservations'),
+            ('get', '/api/reservations/pending'),
+            ('post', '/api/reservations/example/approve'),
+            ('post', '/api/reservations/example/reject'),
+            ('get', '/api/bungalow-dates/Bungalow%201'),
+        ]:
+            with self.subTest(method=method, path=path):
+                with app.test_client() as client:
+                    response = getattr(client, method)(path)
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.headers['Location'].endswith('/admin/login'))
+
+    def test_logged_in_admin_can_list_reservations(self):
+        with app.test_client() as client:
+            with client.session_transaction() as session:
+                session['admin_logged_in'] = True
+            response = client.get('/api/reservations')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.get_json(), list)
     
     @classmethod
     def setUpClass(cls):

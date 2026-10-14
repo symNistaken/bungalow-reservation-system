@@ -525,6 +525,7 @@ def create_reservation():
         return jsonify({'message': 'Bir hata oluştu. Lütfen tekrar deneyiniz.'}), 500
 
 @app.route('/api/reservations', methods=['GET'])
+@login_required
 def get_reservations():
     try:
         reservations = load_reservations()
@@ -535,6 +536,7 @@ def get_reservations():
         return jsonify({'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/api/reservations/pending', methods=['GET'])
+@login_required
 def get_pending_reservations():
     """Get only pending reservations for admin approval"""
     try:
@@ -547,6 +549,7 @@ def get_pending_reservations():
         return jsonify({'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/api/reservations/<reservation_id>/approve', methods=['POST'])
+@login_required
 def approve_reservation(reservation_id):
     """Approve a pending reservation"""
     try:
@@ -582,6 +585,7 @@ def approve_reservation(reservation_id):
         return jsonify({'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/api/reservations/<reservation_id>/reject', methods=['POST'])
+@login_required
 def reject_reservation(reservation_id):
     """Reject a pending reservation"""
     try:
@@ -647,6 +651,7 @@ def get_booked_dates_api():
         return jsonify({'message': 'Bir hata oluştu.'}), 500
 
 @app.route('/api/bungalow-dates/<bungalow>', methods=['GET'])
+@login_required
 def get_bungalow_dates(bungalow):
     """Get approved and pending dates for a specific bungalow with guest names"""
     try:
