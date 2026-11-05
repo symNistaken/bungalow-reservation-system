@@ -23,6 +23,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
 import pytz
 
 # Import database module
@@ -44,8 +45,14 @@ if not admin_password or admin_password == 'admin123':
     raise RuntimeError('Set a non-default ADMIN_PASSWORD before starting the application.')
 if PRODUCTION and (not secret_key or len(secret_key) < 32 or secret_key == 'dev-secret-key-change-in-production'):
     raise RuntimeError('Production requires a random SECRET_KEY of at least 32 characters.')
-if PRODUCTION and (len(admin_password) < 12 or not os.environ.get('RATELIMIT_STORAGE_URI', '').startswith(('redis://', 'rediss://'))):
-    raise RuntimeError('Production requires a 12+ character admin password and shared rate-limit storage.')
+# Public showcase deployment: no e-mails to visitors, sample data, login shown on screen.
+# Never enable this for a real customer: the admin password is displayed publicly.
+DEMO_MODE = os.environ.get('DEMO_MODE', '').strip().lower() in ('1', 'true', 'yes')
+if PRODUCTION and len(admin_password) < 12:
+    raise RuntimeError('Production requires a 12+ character admin password.')
+# A demo runs as a single instance, so in-memory rate limiting is acceptable there.
+if PRODUCTION and not DEMO_MODE and not os.environ.get('RATELIMIT_STORAGE_URI', '').startswith(('redis://', 'rediss://')):
+    raise RuntimeError('Production requires shared rate-limit storage (Redis).')
 app.config.update(
     SECRET_KEY=secret_key or secrets.token_hex(32),
     SESSION_COOKIE_HTTPONLY=True,
@@ -55,6 +62,17 @@ app.config.update(
     MAX_CONTENT_LENGTH=64 * 1024,
 )
 CSRFProtect(app)
+
+# Behind a reverse proxy (Render, nginx) every request arrives from the proxy's IP.
+# Trust exactly TRUST_PROXY_HOPS proxies so rate limits and HTTPS detection use the real client.
+try:
+    TRUST_PROXY_HOPS = int(os.environ.get('TRUST_PROXY_HOPS', '0'))
+except ValueError:
+    raise RuntimeError('TRUST_PROXY_HOPS must be an integer.')
+if TRUST_PROXY_HOPS < 0:
+    raise RuntimeError('TRUST_PROXY_HOPS must be 0 or greater.')
+if TRUST_PROXY_HOPS:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=TRUST_PROXY_HOPS, x_proto=TRUST_PROXY_HOPS)
 
 @app.errorhandler(CSRFError)
 def csrf_error(error):
@@ -68,11 +86,12 @@ Talisman(app,
     strict_transport_security_max_age=31536000,
     content_security_policy={
         'default-src': "'self'",
-        'script-src': ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "cdn.jsdelivr.net"],
-        'style-src': ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
+        'script-src': ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "cdn.jsdelivr.net", "code.iconify.design"],
+        'style-src': ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "cdn.jsdelivr.net", "fonts.googleapis.com"],
         'img-src': ["'self'", "data:", "https:"],
-        'font-src': ["'self'", "fonts.gstatic.com"],
-        'connect-src': "'self'"
+        'font-src': ["'self'", "data:", "fonts.gstatic.com"],
+        # Icons (iconify-icon) are fetched from the Iconify API at runtime.
+        'connect-src': ["'self'", "api.iconify.design", "api.simplesvg.com", "api.unisvg.com"]
     }
 )
 
@@ -129,6 +148,21 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 
+# Per-customer branding: set these in .env for each business that buys the system.
+APP_BASE_URL = os.environ.get('APP_BASE_URL', 'http://localhost:5000').rstrip('/')
+BUSINESS_NAME = os.environ.get('BUSINESS_NAME', 'Bungalow Rezervasyon')
+CONTACT_EMAIL = os.environ.get('CONTACT_EMAIL') or ADMIN_EMAIL or ''
+BUNGALOWS = [name.strip() for name in os.environ.get(
+    'BUNGALOWS', 'Akasya,Ihlamur,Meşe,Palmiye,Zeytin').split(',') if name.strip()]
+if not BUNGALOWS:
+    raise RuntimeError('BUNGALOWS must list at least one bungalow name.')
+
+# Kozalak Bungalov sales page (the product being sold). Digits only for the WhatsApp number.
+SALES_EMAIL = os.environ.get('SALES_EMAIL', 'berkayseyman@gmail.com')
+SALES_WHATSAPP = re.sub(r'\D', '', os.environ.get('SALES_WHATSAPP', '905340806421'))
+SITE_PRICE_FROM = os.environ.get('SITE_PRICE_FROM', '7.500')
+QUOTE_PACKAGES = {'site': 'Tanıtım Sitesi', 'site-rezervasyon': 'Tanıtım Sitesi + Rezervasyon Sistemi', 'belirsiz': 'Henüz karar vermedim'}
+
 # Validate email configuration
 if not EMAIL_SENDER or not EMAIL_PASSWORD or not ADMIN_EMAIL:
     logger.warning("EMAIL KONFİGÜRASYONU EKSIK!")
@@ -150,6 +184,33 @@ ADMIN_CREDENTIALS = {
 # Initialize database
 db.init_db()
 logger.info("SQLite veritabanı başlatıldı")
+
+def seed_demo_data():
+    """Fill an empty demo database with fictional reservations (dates relative to today)."""
+    if db.load_reservations():
+        return
+    today = get_local_datetime().date()
+    samples = [  # (name, bungalow, start offset, nights, guests, status)
+        ('Ayşe Demir', BUNGALOWS[0], 3, 4, 2, 'approved'),
+        ('Mehmet Kaya', BUNGALOWS[1 % len(BUNGALOWS)], 6, 3, 4, 'approved'),
+        ('Elif Yıldız', BUNGALOWS[2 % len(BUNGALOWS)], 10, 5, 3, 'approved'),
+        ('Can Arslan', BUNGALOWS[0], 12, 2, 2, 'pending'),
+        ('Zeynep Çelik', BUNGALOWS[3 % len(BUNGALOWS)], 8, 3, 5, 'pending'),
+    ]
+    for name, bungalow, start, nights, guests, status in samples:
+        check_in = today + timedelta(days=start)
+        db.save_reservation({
+            'id': str(uuid.uuid4()), 'name': name, 'email': 'ornek@example.com',
+            'phone': '05301234567', 'checkIn': check_in.isoformat(),
+            'checkOut': (check_in + timedelta(days=nights)).isoformat(),
+            'guests': guests, 'bungalow': bungalow, 'notes': 'Örnek demo kaydı',
+            'status': status, 'timestamp': get_local_datetime().isoformat(),
+            'approved_date': get_local_datetime().isoformat() if status == 'approved' else None,
+        })
+    logger.info("Demo verileri yüklendi")
+
+if DEMO_MODE:
+    seed_demo_data()
 
 def load_reservations():
     """Load reservations from SQLite database"""
@@ -187,9 +248,10 @@ def get_booked_dates():
 def validate_email(email):
     """Validate email format"""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not email or not isinstance(email, str):
+    if not email or not isinstance(email, str) or len(email) > 254:
         return False
-    return bool(re.match(pattern, email.strip()))
+    # fullmatch: '$' alone would accept a trailing newline, which then lands in the To: header.
+    return bool(re.fullmatch(pattern, email))
 
 def validate_phone(phone):
     """Validate phone format (Turkish or international)"""
@@ -208,8 +270,9 @@ def validate_name(name):
     cleaned = name.strip()
     if len(cleaned) < 2 or len(cleaned) > 100:
         return False
-    pattern = r"^[a-zA-ZçğıöşüÇĞİÖŞÜ\s\-']+$"
-    return bool(re.match(pattern, cleaned))
+    # Plain spaces only: newlines would end up in the e-mail Subject header.
+    pattern = r"[a-zA-ZçğıöşüÇĞİÖŞÜ \-']+"
+    return bool(re.fullmatch(pattern, cleaned))
 
 def validate_guests(guests):
     """Validate guest count"""
@@ -240,12 +303,8 @@ def validate_date_range(check_in_str, check_out_str):
         return False
 
 def validate_bungalow(bungalow):
-    """Validate bungalow name"""
-    if not bungalow or not isinstance(bungalow, str):
-        return False
-    cleaned = bungalow.strip()
-    # Valid bungalow names: 2-50 characters
-    return 2 <= len(cleaned) <= 50
+    """Validate bungalow name against the configured BUNGALOWS list"""
+    return isinstance(bungalow, str) and bungalow in BUNGALOWS
 
 def validate_notes(notes):
     """Validate reservation notes"""
@@ -317,6 +376,8 @@ def send_email(to_email, subject, html_body):
 
 def send_admin_reservation_notification(reservation):
     """Send email to admin when new reservation arrives"""
+    if DEMO_MODE:
+        return False
     reservation = {key: escape(value) if isinstance(value, str) else value for key, value in reservation.items()}
     check_in = datetime.strptime(reservation['checkIn'], '%Y-%m-%d').strftime('%d.%m.%Y')
     check_out = datetime.strptime(reservation['checkOut'], '%Y-%m-%d').strftime('%d.%m.%Y')
@@ -350,7 +411,7 @@ def send_admin_reservation_notification(reservation):
                 <div style="background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 15px 0;">
                     <p style="margin: 0; color: #0C4848;">
                         <strong>⏳ Bu rezervasyon onay bekleniyor.</strong><br>
-                        Admin paneline giderek onaylamak veya reddetmek için <a href="http://localhost:5000/admin" style="color: #667eea; text-decoration: none;">tıklayınız</a>
+                        Admin paneline giderek onaylamak veya reddetmek için <a href="{escape(APP_BASE_URL)}/admin" style="color: #667eea; text-decoration: none;">tıklayınız</a>
                     </p>
                 </div>
                 
@@ -367,6 +428,8 @@ def send_admin_reservation_notification(reservation):
 
 def send_customer_confirmation_email(reservation, approved=True):
     """Send confirmation or rejection email to customer"""
+    if DEMO_MODE:  # visitors type arbitrary addresses; never mail them from a public demo
+        return False
     reservation = {key: escape(value) if isinstance(value, str) else value for key, value in reservation.items()}
     check_in = datetime.strptime(reservation['checkIn'], '%Y-%m-%d').strftime('%d.%m.%Y')
     check_out = datetime.strptime(reservation['checkOut'], '%Y-%m-%d').strftime('%d.%m.%Y')
@@ -381,7 +444,19 @@ def send_customer_confirmation_email(reservation, approved=True):
         status_color = "#dc3545"
         status_text = "RESİRED"
         message = "Maalesef, seçtiğiniz tarihler için rezervasyonunuz reddedilmiştir. Lütfen farklı tarihler seçerek yeniden deneyiniz."
-    
+
+    contact_html = ''
+    if CONTACT_EMAIL:
+        contact = escape(CONTACT_EMAIL)
+        contact_html = f"""
+                <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                    <p style="margin: 0; color: #666; font-size: 14px;">
+                        <strong>Sorularınız var mı?</strong><br>
+                        Bize <a href="mailto:{contact}" style="color: #667eea; text-decoration: none;">{contact}</a>
+                        adresinden ulaşabilirsiniz.
+                    </p>
+                </div>"""
+
     html_body = f"""
     <html>
         <body style="font-family: Arial, sans-serif; direction: ltr;">
@@ -404,17 +479,11 @@ def send_customer_confirmation_email(reservation, approved=True):
                     <p><strong>Misafir Sayısı:</strong> {reservation['guests']} kişi</p>
                 </div>
                 
-                <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                    <p style="margin: 0; color: #666; font-size: 14px;">
-                        <strong>Sorularınız var mı?</strong><br>
-                        Bize <a href="mailto:admin@bungalow.com" style="color: #667eea; text-decoration: none;">admin@bungalow.com</a> 
-                        adresinden ulaşabilirsiniz.
-                    </p>
-                </div>
-                
+                {contact_html}
+
                 <hr style="border: 1px solid #ddd; margin: 20px 0;">
                 <p style="color: #999; font-size: 12px; text-align: center;">
-                    © 2024 Bungalow Rezervasyon Sistemi. Tüm hakları saklıdır.
+                    © {get_local_datetime().year} {escape(BUSINESS_NAME)}. Tüm hakları saklıdır.
                 </p>
             </div>
         </body>
@@ -423,9 +492,57 @@ def send_customer_confirmation_email(reservation, approved=True):
     
     return send_email(reservation['email'], subject, html_body)
 
+@app.context_processor
+def inject_branding():
+    return {
+        'bungalows': BUNGALOWS, 'business_name': BUSINESS_NAME, 'contact_email': CONTACT_EMAIL,
+        'demo_mode': DEMO_MODE, 'demo_admin_user': ADMIN_USERNAME, 'demo_admin_pass': admin_password if DEMO_MODE else '',
+        'sales_whatsapp': SALES_WHATSAPP, 'sales_email': SALES_EMAIL,
+    }
+
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/kozalak')
+def kozalak():
+    return render_template('kozalak.html', site_price_from=SITE_PRICE_FROM, packages=QUOTE_PACKAGES)
+
+@app.route('/api/quote', methods=['POST'])
+@limiter.limit("5 per hour")
+def create_quote_request():
+    """Sales enquiry from the Kozalak page; delivered to SALES_EMAIL."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'message': 'JSON nesnesi gerekli.'}), 400
+    name, business = data.get('name'), data.get('business', '')
+    phone, package, message = data.get('phone'), data.get('package'), data.get('message', '')
+    if not all(isinstance(v, str) for v in (name, business, phone, package, message)):
+        return jsonify({'message': 'Geçersiz alan türü.'}), 400
+    if not validate_name(name):
+        return jsonify({'message': 'Lütfen adınızı ve soyadınızı yazın.'}), 400
+    if not validate_phone(phone):
+        return jsonify({'message': 'Lütfen geçerli bir telefon numarası yazın.'}), 400
+    if package not in QUOTE_PACKAGES:
+        return jsonify({'message': 'Lütfen bir paket seçin.'}), 400
+    business, message = business.strip(), message.strip()
+    # No control characters (incl. newlines): these values are used in mail headers/body.
+    if len(business) > 100 or len(message) > 1000 or re.search(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', business) or '\n' in business or '\r' in business:
+        return jsonify({'message': 'İşletme adı veya mesaj geçersiz ya da çok uzun.'}), 400
+    html_body = f"""
+    <html><body style="font-family: Arial, sans-serif;">
+      <h2 style="color:#0C4848;">Kozalak Bungalov - Yeni teklif talebi</h2>
+      <p><strong>Ad Soyad:</strong> {escape(name)}</p>
+      <p><strong>İşletme:</strong> {escape(business) or '-'}</p>
+      <p><strong>Telefon:</strong> {escape(phone)}</p>
+      <p><strong>Paket:</strong> {escape(QUOTE_PACKAGES[package])}</p>
+      <p><strong>Mesaj:</strong><br>{escape(message).replace(chr(10), '<br>') or '-'}</p>
+    </body></html>"""
+    if not send_email(SALES_EMAIL, f"Kozalak teklif talebi: {name}", html_body):
+        logger.error("Teklif talebi e-postası gönderilemedi")
+        return jsonify({'message': 'Şu an mesajınız iletilemedi. Lütfen WhatsApp üzerinden ulaşın.'}), 503
+    logger.info("Yeni teklif talebi alındı (paket=%s)", package)
+    return jsonify({'message': 'Teşekkürler! Talebinizi aldık, en kısa sürede dönüş yapacağız.'}), 201
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute", methods=["POST"])  # 5 login attempts per minute
@@ -492,45 +609,45 @@ def create_reservation():
 
         # Validate name
         if not validate_name(data['name']):
-            logger.warning(f"Geçersiz ad soyad: {data.get('name')}")
+            logger.warning("Geçersiz ad soyad")
             return jsonify({'message': 'Lütfen geçerli bir ad soyad giriniz (2-100 karakter).'}), 400
         
         # Validate email
         if not validate_email(data['email']):
-            logger.warning(f"Geçersiz email: {data['email']}")
+            logger.warning("Geçersiz email")
             return jsonify({'message': 'Lütfen geçerli bir e-mail adresi giriniz.'}), 400
         
         # Validate phone
         if not validate_phone(data['phone']):
-            logger.warning(f"Geçersiz telefon: {data['phone']}")
+            logger.warning("Geçersiz telefon")
             return jsonify({'message': 'Lütfen geçerli bir telefon numarası giriniz.'}), 400
         
         # Validate guests
         if not validate_guests(data['guests']):
-            logger.warning(f"Geçersiz misafir sayısı: {data['guests']}")
+            logger.warning("Geçersiz misafir sayısı")
             return jsonify({'message': 'Lütfen 1-20 arasında misafir sayısı giriniz.'}), 400
         
         # Validate bungalow
         if not validate_bungalow(data['bungalow']):
-            logger.warning(f"Geçersiz bungalov adı: {data['bungalow']}")
+            logger.warning("Geçersiz bungalov adı")
             return jsonify({'message': 'Lütfen geçerli bir bungalov adı seçiniz.'}), 400
         
         # Validate notes
         if not validate_notes(data.get('notes')):
-            logger.warning(f"Geçersiz notlar: çok uzun")
+            logger.warning("Geçersiz notlar")
             return jsonify({'message': 'Notlar 500 karakterden fazla olamaz.'}), 400
         
         # Validate date format and range
         if not validate_date(data['checkIn']):
-            logger.warning(f"Geçersiz giriş tarihi: {data['checkIn']}")
+            logger.warning("Geçersiz giriş tarihi")
             return jsonify({'message': 'Giriş tarihi bugünden sonra olmalıdır.'}), 400
         
         if not validate_date(data['checkOut']):
-            logger.warning(f"Geçersiz çıkış tarihi: {data['checkOut']}")
+            logger.warning("Geçersiz çıkış tarihi")
             return jsonify({'message': 'Çıkış tarihi bugünden sonra olmalıdır.'}), 400
         
         if not validate_date_range(data['checkIn'], data['checkOut']):
-            logger.warning(f"Geçersiz tarih aralığı: {data['checkIn']} - {data['checkOut']}")
+            logger.warning("Geçersiz tarih aralığı")
             return jsonify({'message': 'Çıkış tarihi giriş tarihinden sonra olmalı ve 90 günü aşmamalıdır.'}), 400
         
         # Check for date conflicts
@@ -545,7 +662,7 @@ def create_reservation():
         # Save to database using database module
         db.create_pending_reservation(data)
         
-        logger.info(f"Yeni rezervasyon: ID={data['id']}, {data['name']}, {data['bungalow']}, {data['checkIn']}-{data['checkOut']}")
+        logger.info(f"Yeni rezervasyon: ID={data['id']}, {data['bungalow']}, {data['checkIn']}-{data['checkOut']}")
         
         # Send email to admin
         send_admin_reservation_notification(data)
@@ -623,7 +740,9 @@ def get_booked_dates_api():
             reservations = db.load_reservations()
             
             for res in reservations:
-                if res.get('bungalow') == bungalow and res.get('status') != 'rejected':
+                # Public endpoint: only approved stays. Showing pending requests let anyone
+                # block the calendar by submitting fake requests.
+                if res.get('bungalow') == bungalow and res.get('status') == 'approved':
                     # Add all dates between check-in and check-out
                     check_in = datetime.strptime(res['checkIn'], '%Y-%m-%d')
                     check_out = datetime.strptime(res['checkOut'], '%Y-%m-%d')

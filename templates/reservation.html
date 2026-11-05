@@ -10,6 +10,7 @@
     <title>Intense Bungalov - Rezervasyon</title>
 </head>
 <body>
+{% include "_demo_banner.html" %}
      <!-- Topbar -->
     <div class="header">
         <div class="top-bar">
@@ -84,11 +85,7 @@
                         <label for="bungalow">Bungalov Türü *</label>
                         <select id="bungalow" name="bungalow" required onchange="loadBookedDates()">
                             <option value="">Bir bungalov seçiniz</option>
-                            <option value="Akasya">Akasya</option>
-                            <option value="Ihlamur">Ihlamur</option>
-                            <option value="Mese">Meşe</option>
-                            <option value="Palmiye">Palmiye</option>
-                            <option value="Zeytin">Zeytin</option>
+                            {% for b in bungalows %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
                         </select>
                     </div>
 

@@ -223,3 +223,19 @@ waitress-serve --listen=127.0.0.1:8000 app:app
 Bu komut yalnızca yerel WSGI başlatır. HTTPS reverse proxy kurulumu, güvenilir proxy ayarları, Redis erişim kontrolü, yedekleme ve e-posta hesabı gerçek sunucu üzerinde ayrıca yapılandırılmalıdır. HTTPS şemasının uygulamaya yalnızca güvenilir proxy üzerinden aktarılması gerekir; rastgele istemcilerin gönderdiği forwarded başlıklarına güvenme.
 
 `test_app` ve `test_security` birlikte 37 test içerir: CSRF, login/logout, üretim yapılandırmasının reddi, eşzamanlı onay, JSON taşıma ve HTML e-posta escape kontrolleri dahil. Testler gerçek müşterilere e-posta göndermez.
+
+## Kozalak Bungalov: demo ve satış sayfası
+
+Ürün olarak sunmak için uygulama bir **demo modu** ve tek sayfalık bir satış sayfası içerir.
+
+- `/kozalak`: tanıtım, paketler, WhatsApp/e-posta bağlantıları ve teklif formu. Paylaşılacak bağlantı budur.
+- `DEMO_MODE=true`: ziyaretçilere e-posta **gönderilmez**, boş veritabanına örnek rezervasyonlar yüklenir, giriş sayfası demo şifresini gösterir ve sayfaların altında "Bu bir demodur" şeridi çıkar. Gerçek bir müşteri kurulumunda **asla** açma, yönetici şifresi herkese görünür olur.
+- Teklif formu `SALES_EMAIL` adresine mail atar (varsayılan `berkayseyman@gmail.com`); WhatsApp numarası `SALES_WHATSAPP`, fiyat `SITE_PRICE_FROM` ile değişir. Form için `EMAIL_SENDER` ve `EMAIL_PASSWORD` ayarlı olmalı, yoksa ziyaretçiye "WhatsApp'tan ulaşın" mesajı gösterilir.
+
+### Render'da yayınlama
+
+1. Depoyu GitHub'a gönder, Render'da **New > Blueprint** ile seç (`render.yaml` hazır).
+2. Panelde `ADMIN_PASSWORD` (12+ karakter, demo şifresi olarak ekranda görünecek), `APP_BASE_URL` ve Gmail bilgilerini gir.
+3. Bungalov görselleri `.gitignore` ile dışarıda tutuluyor; demoda görünmeleri için `static/images` ve `static/videos` satırlarını `.gitignore`'dan çıkarıp dosyaları depoya ekle.
+
+Ücretsiz Render planında servis 15 dakika işlem olmazsa uyur, ilk açılış 30-50 saniye sürebilir; diske yazılan demo verileri yeniden başlatmada sıfırlanır (örnek veriler otomatik yeniden yüklenir).

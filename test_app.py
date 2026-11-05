@@ -80,15 +80,23 @@ class ValidationTestCase(unittest.TestCase):
     
     def test_validate_bungalow_valid(self):
         """Test valid bungalow names"""
-        self.assertTrue(validate_bungalow('Bungalow 1'))
-        self.assertTrue(validate_bungalow('Evi Komfort'))
-        self.assertTrue(validate_bungalow('A1'))
+        self.assertTrue(validate_bungalow('Akasya'))
+        self.assertTrue(validate_bungalow('Meşe'))
     
     def test_validate_bungalow_invalid(self):
         """Test invalid bungalow names"""
-        self.assertFalse(validate_bungalow('A'))  # Too short
+        self.assertFalse(validate_bungalow('A'))
         self.assertFalse(validate_bungalow(''))
         self.assertFalse(validate_bungalow(None))
+        self.assertFalse(validate_bungalow('Olmayan Bungalov'))  # Not in BUNGALOWS
+        self.assertFalse(validate_bungalow(' Akasya'))
+
+    def test_header_injection_rejected(self):
+        """Newlines must not reach e-mail headers"""
+        self.assertFalse(validate_email('a@b.com\n'))
+        self.assertFalse(validate_email('a@b.com\nBcc: x@y.com'))
+        self.assertFalse(validate_name('Ali\nVeli'))
+        self.assertTrue(validate_name('Ali Veli'))
     
     def test_validate_notes_valid(self):
         """Test valid notes"""

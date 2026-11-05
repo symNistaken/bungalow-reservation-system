@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description" content="Kozalak Bungalov: bungalov ve butik konaklama işletmeleri için tanıtım sitesi ve online rezervasyon sistemi.">
+    <title>Kozalak Bungalov | Rezervasyon Sistemi ve Tanıtım Sitesi</title>
+    <style>
+        :root {
+            --green: #0C4848;
+            --green-dark: #082f2f;
+            --accent: #d9a441;
+            --bg: #f6f4ef;
+            --card: #ffffff;
+            --text: #1d2b2b;
+            --muted: #5d6b6b;
+            --line: #e3ded3;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: var(--text); background: var(--bg); line-height: 1.6; padding-bottom: 70px; }
+        a { color: inherit; }
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+        header.nav { background: var(--green-dark); color: #fff; }
+        header.nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+        .brand { font-weight: 700; font-size: 20px; letter-spacing: .3px; text-decoration: none; display: flex; align-items: center; gap: 10px; }
+        .brand svg { width: 26px; height: 26px; }
+        .nav a.link { color: #cfe3e0; text-decoration: none; margin-left: 22px; font-size: 15px; }
+        .nav a.link:hover { color: #fff; }
+
+        .hero { background: linear-gradient(160deg, var(--green) 0%, var(--green-dark) 100%); color: #fff; padding: 72px 0 80px; }
+        .hero h1 { font-size: clamp(30px, 5vw, 48px); line-height: 1.15; margin: 0 0 16px; max-width: 720px; }
+        .hero p { font-size: 19px; color: #d6e8e5; max-width: 620px; margin: 0 0 30px; }
+        .btns { display: flex; flex-wrap: wrap; gap: 12px; }
+        .btn { display: inline-block; padding: 13px 24px; border-radius: 999px; font-weight: 600; text-decoration: none; font-size: 16px; border: 2px solid transparent; cursor: pointer; font-family: inherit; transition: transform .15s, background .2s; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-wa { background: #25D366; color: #06331a; }
+        .btn-light { background: #fff; color: var(--green); }
+        .btn-ghost { border-color: rgba(255,255,255,.55); color: #fff; }
+        .btn-green { background: var(--green); color: #fff; }
+
+        section { padding: 64px 0; }
+        h2 { font-size: 30px; margin: 0 0 8px; color: var(--green); }
+        .lead { color: var(--muted); max-width: 640px; margin: 0 0 36px; }
+        .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+        .card h3 { margin: 0 0 8px; font-size: 19px; color: var(--green); }
+        .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+        .demo-box { background: var(--green); color: #fff; border-radius: 16px; padding: 32px; display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+        .demo-box h3 { margin: 0 0 6px; font-size: 20px; }
+        .demo-box p { margin: 0 0 14px; color: #cfe3e0; font-size: 15px; }
+        .cred { background: rgba(255,255,255,.12); border-radius: 8px; padding: 8px 12px; font-family: Consolas, monospace; font-size: 14px; margin-bottom: 14px; display: inline-block; }
+
+        .plans { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); align-items: stretch; }
+        .plan { background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 30px; display: flex; flex-direction: column; position: relative; }
+        .plan.featured { border-color: var(--green); }
+        .badge { position: absolute; top: -13px; left: 24px; background: var(--accent); color: #3b2a05; font-size: 13px; font-weight: 700; padding: 3px 12px; border-radius: 999px; }
+        .plan h3 { margin: 0; font-size: 22px; color: var(--green); }
+        .price { font-size: 30px; font-weight: 700; margin: 14px 0 4px; }
+        .price small { font-size: 15px; font-weight: 400; color: var(--muted); }
+        .plan ul { padding-left: 0; list-style: none; margin: 18px 0 26px; flex: 1; }
+        .plan li { padding: 5px 0 5px 26px; position: relative; font-size: 15px; }
+        .plan li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+        .plan .btn { text-align: center; }
+
+        .contact { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 32px; display: grid; gap: 32px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+        form label { display: block; font-size: 14px; font-weight: 600; margin: 12px 0 4px; }
+        form input, form select, form textarea { width: 100%; padding: 11px 12px; border: 1px solid #cfc9bb; border-radius: 8px; font: inherit; background: #fff; }
+        form input:focus, form select:focus, form textarea:focus { outline: 2px solid var(--green); border-color: var(--green); }
+        form button { margin-top: 18px; width: 100%; }
+        #formMsg { margin-top: 12px; font-size: 15px; display: none; padding: 10px 12px; border-radius: 8px; }
+        #formMsg.ok { display: block; background: #e3f4e8; color: #14532d; }
+        #formMsg.err { display: block; background: #fde8e8; color: #7f1d1d; }
+        .quick p { color: var(--muted); }
+        .quick .btn { display: block; text-align: center; margin-bottom: 12px; }
+        .btn-mail { border-color: var(--green); color: var(--green); }
+
+        footer { background: var(--green-dark); color: #aac7c3; padding: 28px 0; font-size: 14px; text-align: center; }
+        footer small { display: block; margin-top: 6px; color: #7fa39e; }
+        @media (max-width: 600px) { .nav a.link { display: none; } .hero { padding: 48px 0 56px; } section { padding: 44px 0; } }
+    </style>
+</head>
+<body>
+{% set wa_base = 'https://wa.me/' ~ sales_whatsapp %}
+<header class="nav">
+    <div class="wrap">
+        <a href="/kozalak" class="brand">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path fill="#d9a441" d="M16 2C22 7 25 14 23 22c-1 4-4 8-7 8s-6-4-7-8C7 14 10 7 16 2z"/><path fill="none" stroke="#082f2f" stroke-width="1.6" stroke-linecap="round" d="M10 12q6 3 12 0M9 17q7 3.500 14 0M10.500 22q5.500 3 11 0"/></svg>
+            Kozalak Bungalov
+        </a>
+        <nav>
+            <a class="link" href="#demo">Demo</a>
+            <a class="link" href="#paketler">Paketler</a>
+            <a class="link" href="#teklif">Teklif Al</a>
+        </nav>
+    </div>
+</header>
+
+<div class="hero">
+    <div class="wrap">
+        <h1>Bungalov işletmeniz için online rezervasyon, tek panelde.</h1>
+        <p>Misafirleriniz tarihini seçip talep göndersin, siz onaylayın. Telefon trafiği ve defterdeki karışıklık bitsin. Önce demoyu deneyin, beğenirseniz markanıza göre kuralım.</p>
+        <div class="btns">
+            <a class="btn btn-wa" href="{{ wa_base }}?text={{ 'Merhaba, Kozalak Bungalov hakkında bilgi almak istiyorum.' | urlencode }}" target="_blank" rel="noopener">WhatsApp'tan yazın</a>
+            <a class="btn btn-light" href="#demo">Canlı demoyu deneyin</a>
+            <a class="btn btn-ghost" href="#paketler">Paketleri görün</a>
+        </div>
+    </div>
+</div>
+
+<section>
+    <div class="wrap">
+        <h2>Neler sunuyoruz?</h2>
+        <p class="lead">Küçük ve orta ölçekli konaklama işletmeleri için sade, hızlı kurulan bir sistem.</p>
+        <div class="grid">
+            <div class="card"><h3>Rezervasyon talebi</h3><p>Misafir ad, iletişim bilgisi, bungalov ve tarihleri seçip talebini gönderir. Dolu tarihler takvimde görünür.</p></div>
+            <div class="card"><h3>Çakışma kontrolü</h3><p>Aynı bungalov için onaylı rezervasyonlarla çakışan tarihler otomatik engellenir.</p></div>
+            <div class="card"><h3>Yönetici paneli</h3><p>Talepleri tek ekranda görün, onaylayın veya reddedin. Takvimden bungalov doluluğunu izleyin.</p></div>
+            <div class="card"><h3>E-posta bildirimi</h3><p>Yeni talep geldiğinde size, karar verdiğinizde misafire e-posta gider.</p></div>
+            <div class="card"><h3>Tanıtım sitesi</h3><p>Bungalovlarınızı, galerinizi ve iletişim bilgilerinizi markanıza uygun bir sitede sergileyin.</p></div>
+            <div class="card"><h3>Güvenlik</h3><p>Yönetici girişi, form koruması ve istek sınırlaması ile talepleriniz ve misafir bilgileri korunur.</p></div>
+        </div>
+    </div>
+</section>
+
+<section id="demo" style="padding-top:0">
+    <div class="wrap">
+        <h2>Canlı demoyu deneyin</h2>
+        <p class="lead">Aşağıdaki demo, bir işletmenin sitesinin nasıl görüneceğinin minyatürüdür. Kendi bungalovlarınız, renkleriniz ve görselleriniz ile hazırlanır.</p>
+        <div class="demo-box">
+            <div>
+                <h3>Misafir gözüyle</h3>
+                <p>Ana sayfayı gezin, bir bungalov seçip rezervasyon talebi gönderin.</p>
+                <div class="btns">
+                    <a class="btn btn-light" href="/">Demo siteyi aç</a>
+                    <a class="btn btn-ghost" href="/reservation">Rezervasyon yap</a>
+                </div>
+            </div>
+            <div>
+                <h3>İşletme sahibi gözüyle</h3>
+                <p>Gönderdiğiniz talebi yönetici panelinde görün ve onaylayın.</p>
+                {% if demo_mode %}<div class="cred">{{ demo_admin_user }} / {{ demo_admin_pass }}</div><br>{% endif %}
+                <a class="btn btn-light" href="/admin/login">Yönetici paneline gir</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="paketler" style="padding-top:0">
+    <div class="wrap">
+        <h2>Paketler</h2>
+        <p class="lead">İhtiyacınıza göre iki seçenek. Kesin fiyat, bungalov sayınıza ve isteklerinize göre teklifle belirlenir.</p>
+        <div class="plans">
+            <div class="plan">
+                <h3>Tanıtım Sitesi</h3>
+                <div class="price">{{ site_price_from }} TL'den başlayan fiyatlarla <small>tek seferlik</small></div>
+                <ul>
+                    <li>İşletmenize özel tanıtım sitesi</li>
+                    <li>Bungalov tanıtım sayfaları</li>
+                    <li>Fotoğraf galerisi</li>
+                    <li>İletişim bilgileri ve konum</li>
+                </ul>
+                <a class="btn btn-green" href="#teklif" data-package="site">Teklif alın</a>
+            </div>
+            <div class="plan featured">
+                <span class="badge">Önerilen</span>
+                <h3>Tanıtım Sitesi + Rezervasyon Sistemi</h3>
+                <div class="price">Teklif alın <small>aylık paket</small></div>
+                <ul>
+                    <li>Tanıtım sitesindeki her şey</li>
+                    <li>Online rezervasyon talebi ve takvim</li>
+                    <li>Yönetici paneli, onay ve red</li>
+                    <li>E-posta bildirimleri</li>
+                    <li>Hosting dahil, sunucuyu biz yönetiriz</li>
+                </ul>
+                <a class="btn btn-green" href="#teklif" data-package="site-rezervasyon">Teklif alın</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="teklif" style="padding-top:0">
+    <div class="wrap">
+        <h2>Teklif alın</h2>
+        <p class="lead">Formu doldurun ya da doğrudan yazın, aynı gün içinde dönüş yapmaya çalışırız.</p>
+        <div class="contact">
+            <form id="quoteForm" novalidate>
+                <label for="q-name">Ad Soyad *</label>
+                <input id="q-name" name="name" maxlength="100" autocomplete="name" required>
+                <label for="q-business">İşletme adı</label>
+                <input id="q-business" name="business" maxlength="100" autocomplete="organization">
+                <label for="q-phone">Telefon *</label>
+                <input id="q-phone" name="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="05xx xxx xx xx" required>
+                <label for="q-package">İlgilendiğiniz paket *</label>
+                <select id="q-package" name="package">
+                    {% for key, label in packages.items() %}<option value="{{ key }}"{% if key == 'site-rezervasyon' %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+                <label for="q-message">Mesajınız</label>
+                <textarea id="q-message" name="message" rows="4" maxlength="1000" placeholder="Kaç bungalovunuz var? Özel bir isteğiniz var mı?"></textarea>
+                <button class="btn btn-green" type="submit">Teklif talebi gönder</button>
+                <div id="formMsg" role="status"></div>
+            </form>
+            <div class="quick">
+                <h3 style="margin-top:0;color:var(--green)">Hızlı iletişim</h3>
+                <p>Form doldurmak istemezseniz doğrudan ulaşın.</p>
+                <a class="btn btn-wa" href="{{ wa_base }}?text={{ 'Merhaba, Kozalak Bungalov için teklif almak istiyorum.' | urlencode }}" target="_blank" rel="noopener">WhatsApp'tan yazın</a>
+                <a class="btn btn-mail" href="mailto:{{ sales_email }}?subject={{ 'Kozalak Bungalov teklif talebi' | urlencode }}">{{ sales_email }}</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap">
+        Kozalak Bungalov &copy; 2026
+        <small>Berkay Seyman · Bilal Berke Ceylan · Eren Batı Altunkapak</small>
+    </div>
+</footer>
+{% include "_demo_banner.html" %}
+
+<script>
+    // Package buttons preselect the matching option in the form.
+    document.querySelectorAll('[data-package]').forEach(function (a) {
+        a.addEventListener('click', function () {
+            document.getElementById('q-package').value = a.dataset.package;
+        });
+    });
+
+    document.getElementById('quoteForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var form = e.target, msg = document.getElementById('formMsg'), btn = form.querySelector('button');
+        msg.className = ''; msg.textContent = '';
+        var payload = {
+            name: form.name.value.trim(), business: form.business.value.trim(),
+            phone: form.phone.value.trim(), package: form.package.value, message: form.message.value.trim()
+        };
+        if (!payload.name || !payload.phone) {
+            msg.className = 'err'; msg.textContent = 'Lütfen ad soyad ve telefon alanlarını doldurun.'; return;
+        }
+        btn.disabled = true;
+        try {
+            var res = await fetch('/api/quote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name=csrf-token]').content },
+                body: JSON.stringify(payload)
+            });
+            var data = await res.json().catch(function () { return {}; });
+            msg.className = res.ok ? 'ok' : 'err';
+            msg.textContent = data.message || (res.ok ? 'Talebiniz alındı.' : 'Bir hata oluştu. Lütfen WhatsApp üzerinden ulaşın.');
+            if (res.ok) form.reset();
+        } catch (err) {
+            msg.className = 'err'; msg.textContent = 'Bağlantı hatası. Lütfen WhatsApp üzerinden ulaşın.';
+        }
+        btn.disabled = false;
+    });
+</script>
+</body>
+</html>

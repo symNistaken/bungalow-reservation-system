@@ -2,6 +2,7 @@ import os
 os.environ.setdefault('ADMIN_PASSWORD','test-only-strong-password')
 os.environ.setdefault('SECRET_KEY','test-only-secret-key-with-32-characters')
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 import re
 import subprocess
@@ -11,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import unittest
 from unittest.mock import patch
 from app import app, send_admin_reservation_notification
+import app as app_module
 import database as db
 
 
@@ -118,3 +120,81 @@ class TransactionTests(unittest.TestCase):
             self.assertTrue(Path('reservations.json').is_file())
         finally:
             os.chdir(old_dir)
+
+    def test_public_booked_dates_hide_pending_requests(self):
+        future=(datetime.now()+timedelta(days=30)).strftime('%Y-%m-%d')
+        later=(datetime.now()+timedelta(days=32)).strftime('%Y-%m-%d')
+        db.save_reservation(dict(id='pending-only',name='Test',email='test@example.com',phone='05301234567',checkIn=future,checkOut=later,guests=2,bungalow='Akasya',status='pending'))
+        try:
+            with app.test_client() as client:
+                dates=client.get('/api/booked-dates?bungalow=Akasya').get_json()['booked_dates']
+            self.assertNotIn(future,dates)
+        finally:
+            db.delete_reservation('pending-only')
+
+    def test_admin_email_link_uses_configured_base_url(self):
+        reservation=dict(id='x',name='Test',email='test@example.com',phone='05301234567',checkIn='2030-01-01',checkOut='2030-01-03',guests=2,bungalow='Akasya')
+        with patch('app.APP_BASE_URL','https://demo.example.com'), patch('app.send_email',return_value=True) as send:
+            send_admin_reservation_notification(reservation)
+        body=send.call_args.args[2]
+        self.assertIn('https://demo.example.com/admin',body)
+        self.assertNotIn('localhost:5000',body)
+
+
+    def _quote(self, client, **overrides):
+        app_module.limiter.reset()  # rate limit is tested separately; keep tests independent
+        page = client.get('/kozalak').get_data(as_text=True)
+        token = re.search(r'name="csrf-token" content="([^"]+)"', page).group(1)
+        payload = dict(name='Test Kişi', business='Test Bungalov', phone='05301234567', package='site-rezervasyon', message='Merhaba')
+        payload.update(overrides)
+        return client.post('/api/quote', json=payload, headers={'X-CSRFToken': token})
+
+    def test_sales_page_renders_contact_links(self):
+        with app.test_client() as client:
+            page = client.get('/kozalak').get_data(as_text=True)
+        self.assertIn('https://wa.me/905340806421', page)
+        self.assertIn('mailto:berkayseyman@gmail.com', page)
+        self.assertIn('7.500 TL', page)
+
+    def test_quote_requires_csrf(self):
+        with app.test_client() as client:
+            response = client.post('/api/quote', json=dict(name='Test Kişi', phone='05301234567', package='site'))
+        self.assertEqual(response.status_code, 400)
+
+    def test_quote_validation_and_delivery(self):
+        with app.test_client() as client, patch('app.send_email', return_value=True) as send:
+            self.assertEqual(self._quote(client, name='Ali\nBcc: x').status_code, 400)
+            self.assertEqual(self._quote(client, business='A\nB').status_code, 400)
+            self.assertEqual(self._quote(client, package='yok').status_code, 400)
+            self.assertEqual(self._quote(client, phone='abc').status_code, 400)
+            send.assert_not_called()
+            self.assertEqual(self._quote(client, message='<script>x</script>').status_code, 201)
+        to, subject, body = send.call_args.args
+        self.assertEqual(to, 'berkayseyman@gmail.com')
+        self.assertNotIn('<script>', body)
+
+    def test_quote_reports_mail_failure(self):
+        with app.test_client() as client, patch('app.send_email', return_value=False):
+            self.assertEqual(self._quote(client).status_code, 503)
+
+    def test_demo_mode_never_mails_visitors(self):
+        reservation = dict(id='x', name='Test', email='visitor@example.com', phone='05301234567', checkIn='2030-01-01', checkOut='2030-01-03', guests=2, bungalow='Akasya')
+        with patch('app.DEMO_MODE', True), patch('app.send_email', return_value=True) as send:
+            self.assertFalse(send_admin_reservation_notification(reservation))
+            self.assertFalse(app_module.send_customer_confirmation_email(reservation))
+        send.assert_not_called()
+
+    def test_demo_seed_populates_empty_database(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old_dir = os.getcwd()
+            os.chdir(tmp)
+            try:
+                db.init_db()
+                app_module.seed_demo_data()
+                statuses = {r['status'] for r in db.load_reservations()}
+                self.assertEqual(statuses, {'approved', 'pending'})
+                count = len(db.load_reservations())
+                app_module.seed_demo_data()  # second call must not duplicate
+                self.assertEqual(len(db.load_reservations()), count)
+            finally:
+                os.chdir(old_dir)

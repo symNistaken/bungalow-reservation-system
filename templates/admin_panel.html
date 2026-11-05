@@ -400,6 +400,7 @@
     </style>
 </head>
 <body>
+{% include "_demo_banner.html" %}
     <div class="header">
         <h1>🏠 Bungalow Admin Panel</h1>
         <form action="/admin/logout" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout-btn" type="submit">Çıkış Yap</button></form>
@@ -483,11 +484,7 @@
                     <label for="bungalowSelect">Bungalov Seçin:</label>
                     <select id="bungalowSelect">
                         <option value="">-- Seçiniz --</option>
-                        <option value="Akasya">Akasya</option>
-                        <option value="Ihlamur">Ihlamur</option>
-                        <option value="Mese">Meşe</option>
-                        <option value="Palmiye">Palmiye</option>
-                        <option value="Zeytin">Zeytin</option>
+                        {% for b in bungalows %}<option value="{{ b }}">{{ b }}</option>{% endfor %}
                     </select>
                 </div>
 
@@ -689,7 +686,7 @@
                 document.getElementById('calendar').style.display = 'block';
                 currentBungalow = selectedBungalow;
 
-                const response = await fetch(`/api/bungalow-dates/${selectedBungalow}`);
+                const response = await fetch(`/api/bungalow-dates/${encodeURIComponent(selectedBungalow)}`);
                 const data = await response.json();
                 
                 const dateInfo = data.date_info || {};

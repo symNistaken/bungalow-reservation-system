@@ -129,6 +129,7 @@
     </style>
 </head>
 <body>
+{% include "_demo_banner.html" %}
     <div class="login-container">
         <div class="login-header">
             <h1>Admin Panel</h1>
@@ -156,9 +157,11 @@
             <div class="error-message" id="errorMessage"></div>
         </form>
 
-        <p style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
-            Demo Credentials: admin / admin123
+        {% if demo_mode %}
+        <p style="text-align: center; margin-top: 20px; color: #666; font-size: 13px;">
+            Demo girişi: <strong>{{ demo_admin_user }}</strong> / <strong>{{ demo_admin_pass }}</strong>
         </p>
+        {% endif %}
     </div>
 
     <script>

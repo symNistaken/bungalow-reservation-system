@@ -1,0 +1,37 @@
+# Render Blueprint: Kozalak Bungalov canlı demo.
+# Render panelinde New > Blueprint ile bu depoyu seçin; sync:false olan değerleri panelden girin.
+services:
+  - type: web
+    name: kozalak-bungalov-demo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: waitress-serve --listen=0.0.0.0:$PORT app:app
+    healthCheckPath: /kozalak
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.14
+      - key: APP_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
+      # Demo giriş şifresi ekranda herkese gösterilir; gerçek bir şifre kullanmayın (12+ karakter).
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Render tek bir ters proxy kullanır; gerçek istemci IP'si için gerekli.
+      - key: TRUST_PROXY_HOPS
+        value: "1"
+      # Örnek: https://kozalak-bungalov-demo.onrender.com
+      - key: APP_BASE_URL
+        sync: false
+      - key: BUSINESS_NAME
+        value: Kozalak Bungalov Demo
+      # Teklif formunun size mail atabilmesi için Gmail uygulama şifresi gerekir.
+      - key: EMAIL_SENDER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        value: berkayseyman@gmail.com
