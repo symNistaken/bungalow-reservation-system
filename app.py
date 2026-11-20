@@ -158,7 +158,7 @@ if not BUNGALOWS:
     raise RuntimeError('BUNGALOWS must list at least one bungalow name.')
 
 # Kozalak Bungalov sales page (the product being sold). Digits only for the WhatsApp number.
-SALES_EMAIL = os.environ.get('SALES_EMAIL', 'berkayseyman@gmail.com')
+SALES_EMAIL = os.environ.get('SALES_EMAIL', 'berkayseymann@gmail.com')
 SALES_WHATSAPP = re.sub(r'\D', '', os.environ.get('SALES_WHATSAPP', '905340806421'))
 SITE_PRICE_FROM = os.environ.get('SITE_PRICE_FROM', '7.500')
 QUOTE_PACKAGES = {'site': 'Tanıtım Sitesi', 'site-rezervasyon': 'Tanıtım Sitesi + Rezervasyon Sistemi', 'belirsiz': 'Henüz karar vermedim'}

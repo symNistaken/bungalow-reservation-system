@@ -194,7 +194,7 @@ Fork'tan gelen frontend ve diğer geliştiricilerin katkıları yeniden lisansla
 
 ## İletişim ve ek belgeler
 
-- Berkay Seyman: berkayseyman@gmail.com
+- Berkay Seyman: berkayseymann@gmail.com
 - Bilal Berke Ceylan: bilalberkeceylan@gmail.com
 - Eren Batı Altunkapak: erenbatialtunkapak@gmail.com
 
@@ -230,7 +230,7 @@ Bu komut yalnızca yerel WSGI başlatır. HTTPS reverse proxy kurulumu, güvenil
 
 - `/kozalak`: tanıtım, paketler, WhatsApp/e-posta bağlantıları ve teklif formu. Paylaşılacak bağlantı budur.
 - `DEMO_MODE=true`: ziyaretçilere e-posta **gönderilmez**, boş veritabanına örnek rezervasyonlar yüklenir, giriş sayfası demo şifresini gösterir ve sayfaların altında "Bu bir demodur" şeridi çıkar. Gerçek bir müşteri kurulumunda **asla** açma, yönetici şifresi herkese görünür olur.
-- Teklif formu `SALES_EMAIL` adresine mail atar (varsayılan `berkayseyman@gmail.com`); WhatsApp numarası `SALES_WHATSAPP`, fiyat `SITE_PRICE_FROM` ile değişir. Form için `EMAIL_SENDER` ve `EMAIL_PASSWORD` ayarlı olmalı, yoksa ziyaretçiye "WhatsApp'tan ulaşın" mesajı gösterilir.
+- Teklif formu `SALES_EMAIL` adresine mail atar (varsayılan `berkayseymann@gmail.com`); WhatsApp numarası `SALES_WHATSAPP`, fiyat `SITE_PRICE_FROM` ile değişir. Form için `EMAIL_SENDER` ve `EMAIL_PASSWORD` ayarlı olmalı, yoksa ziyaretçiye "WhatsApp'tan ulaşın" mesajı gösterilir.
 
 ### Render'da yayınlama
 

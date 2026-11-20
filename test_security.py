@@ -153,7 +153,7 @@ class TransactionTests(unittest.TestCase):
         with app.test_client() as client:
             page = client.get('/kozalak').get_data(as_text=True)
         self.assertIn('https://wa.me/905340806421', page)
-        self.assertIn('mailto:berkayseyman@gmail.com', page)
+        self.assertIn('mailto:berkayseymann@gmail.com', page)
         self.assertIn('7.500 TL', page)
 
     def test_quote_requires_csrf(self):
@@ -170,7 +170,7 @@ class TransactionTests(unittest.TestCase):
             send.assert_not_called()
             self.assertEqual(self._quote(client, message='<script>x</script>').status_code, 201)
         to, subject, body = send.call_args.args
-        self.assertEqual(to, 'berkayseyman@gmail.com')
+        self.assertEqual(to, 'berkayseymann@gmail.com')
         self.assertNotIn('<script>', body)
 
     def test_quote_reports_mail_failure(self):
