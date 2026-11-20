@@ -5,7 +5,7 @@
 [![Python checks](https://github.com/symNistaken/bungalow-reservation-system/actions/workflows/checks.yml/badge.svg)](https://github.com/symNistaken/bungalow-reservation-system/actions/workflows/checks.yml)
 [![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
 ![Flask](https://img.shields.io/badge/Flask-Flask-242938?logo=flask&logoColor=white)
-[![MIT contributions](https://img.shields.io/badge/License-MIT%20contributions-green.svg)](LICENSE-SCOPE.md)
+[![License: All rights reserved](https://img.shields.io/badge/License-All%20rights%20reserved-lightgrey.svg)](LICENSE-SCOPE.md)
 
 Flask ve SQLite ile geliştirilmiş bungalov rezervasyon uygulaması. Müşteriler rezervasyon talebi oluşturabilir; yöneticiler talepleri inceleyip onaylayabilir veya reddedebilir.
 
@@ -188,9 +188,9 @@ E-posta testi SMTP'ye bağlanır ve yapılandırılmış adreslere bildirim gön
 
 Frontend kökeni [CGhost1908/bungalow](https://github.com/CGhost1908/bungalow) projesidir. Rezervasyon backend'i, SQLite entegrasyonu ve yönetim paneli **Berkay Seyman** tarafından geliştirilmiştir.
 
-**Berkay Seyman'a ait özgün katkılar [MIT Lisansı](LICENSE) ile yayımlanır.** Bu katkıların ticari kullanımı, değiştirilmesi ve dağıtımı serbesttir; telif ve lisans metni korunmalıdır.
+**Berkay Seyman'a ait özgün katkıların [tüm hakları saklıdır](LICENSE).** Bu katkılar yazılı izin olmadan kullanılamaz, kopyalanamaz, değiştirilemez ve dağıtılamaz. 20 Kasım 2026'dan önce MIT Lisansı ile alınmış kopyalar o lisansa tabi olmaya devam eder.
 
-Fork'tan gelen frontend ve diğer geliştiricilerin katkıları yeniden lisanslanmaz. MIT kapsamı ve üçüncü taraf hakları için [lisans kapsamı](LICENSE-SCOPE.md) belgesine bakın.
+Fork'tan gelen frontend ve diğer geliştiricilerin katkıları yeniden lisanslanmaz. Kapsam ve üçüncü taraf hakları için [lisans kapsamı](LICENSE-SCOPE.md) belgesine bakın.
 
 ## İletişim ve ek belgeler
 
